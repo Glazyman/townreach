@@ -24,7 +24,7 @@ import {
   X
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const CoverageMap = dynamic(
   () => import("@/components/coverage-map").then((m) => m.CoverageMap),
@@ -418,6 +418,10 @@ export function Dashboard({ data }: DashboardProps) {
     setDrawerOpen(true);
   }
 
+  const closeComposer = useCallback(() => {
+    setDrawerOpen(false);
+  }, []);
+
   async function handleSparkle() {
     if (readyForLookup && selectedMunicipality && effectiveDepartment) {
       setSearchLoading(true);
@@ -753,7 +757,7 @@ export function Dashboard({ data }: DashboardProps) {
         municipality={composerMunicipality}
         department={selectedContact ? data.departments.find((d) => d.id === selectedContact.departmentId) : undefined}
         emailSettings={emailSettings}
-        onClose={() => setDrawerOpen(false)}
+        onClose={closeComposer}
         onOpenEmailSettings={() => {
           setDrawerOpen(false);
           setMobileNavOpen(false);
@@ -1733,6 +1737,21 @@ function ComposerDrawer({
   const [body, setBody] = useState("");
 
   useEffect(() => {
+    if (!open) {
+      setSendState("idle");
+      setSendErrorDetail("");
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (sendState !== "sent" || !open) return;
+    const id = window.setTimeout(() => {
+      onClose();
+    }, 2400);
+    return () => window.clearTimeout(id);
+  }, [sendState, open, onClose]);
+
+  useEffect(() => {
     if (!templates.length) return;
     if (!templates.some((t) => t.id === templateId)) {
       setTemplateId(templates[0].id);
@@ -1944,7 +1963,9 @@ function ComposerDrawer({
               )}
             </button>
             <p className="mt-3 text-center text-xs text-slate-500">
-              {sendState === "sent" && <span className="font-medium text-emerald-800">Use Done above to close the composer.</span>}
+              {sendState === "sent" && (
+                <span className="font-medium text-emerald-800">Closing in a moment — or tap Done to close now.</span>
+              )}
               {sendState === "error" && (
                 <span className="text-red-700">
                   {sendErrorDetail ? sendErrorDetail : "Something went wrong sending this email."}
