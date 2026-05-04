@@ -1,0 +1,202 @@
+# Implementation Plan
+
+- [ ] 1. Write bug condition exploration tests
+  - **Property 1: Bug Condition** - Geography Gaps, Dead Buttons, Inert Inputs, Incomplete Departments
+  - **CRITICAL**: Write these tests BEFORE implementing any fix — failure confirms the bugs exist
+  - **DO NOT attempt to fix the tests or the code when they fail**
+  - **NOTE**: These tests encode the expected behavior — they will validate the fix when they pass after implementation
+  - **GOAL**: Surface counterexamples that demonstrate each bug condition
+  - **Scoped PBT Approach**: Scope geography properties to the concrete failing cases (states not in the original 10, counties not in the original 32)
+  - Test 1a — Geography state coverage: for each of the 50 state IDs, assert `counties.filter(c => c.stateId === stateId).length > 0`; expect failures for the 40 states outside `{ "ny","nj","ma","ct","pa","ca","tx","fl","il","ga" }`
+  - Test 1b — Geography county coverage: for each county ID in `counties`, assert `municipalities.filter(m => m.countyId === countyId).length > 0`; expect failures for all counties except Bergen NJ and the handful of scattered entries
+  - Test 1c — Incomplete departments: assert `departments.find(d => d.id === "fire")` is not undefined; expect `undefined` on the original 7-department list
+  - Test 1d — Dead Sparkle button: render `<FilterBar>` with React Testing Library, click the Sparkle button, assert a visible state change occurred; expect no change
+  - Test 1e — Inert search bar: render `<Dashboard>`, type "Cambridge" into the search input, assert the contacts table filters; expect no change
+  - Test 1f — Dead nav: render `<Dashboard>`, click "Contact Finder" in the sidebar, assert `activePanel` changes; expect no change
+  - Run all tests on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests FAIL (this is correct — it proves the bugs exist)
+  - Document counterexamples found (e.g., `counties.filter(c => c.stateId === "tx")` returns only `[travis-tx]`; Sparkle click produces no DOM change; search input change produces no contact list change)
+  - Mark task complete when tests are written, run, and failures are documented
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.10_
+
+- [ ] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** - Existing Geography, Contacts, Email Flow, and Keyword Scoring
+  - **IMPORTANT**: Follow observation-first methodology — run UNFIXED code with non-buggy inputs and record actual outputs
+  - Observe: `counties.filter(c => c.stateId === "nj").length` returns 21 on unfixed code
+  - Observe: `municipalities.filter(m => m.countyId === "bergen-nj").length` returns 70 on unfixed code
+  - Observe: `contacts.length` returns 9 on unfixed code
+  - Observe: `recommendDepartment(departments, "flooring permit")` returns `building` on unfixed code
+  - Observe: `recommendDepartment(departments, "vendor bid")` returns `procurement` on unfixed code
+  - Observe: `recommendDepartment(departments, "school board")` returns `education` on unfixed code
+  - Observe: `recommendDepartment(departments, "public records")` returns `clerk` on unfixed code
+  - Write property-based test: for all state IDs in `{ "ny","nj","ma","ct","pa","ca","tx","fl","il","ga" }`, the fixed counties array returns the same records as the original (from Preservation Requirements in design)
+  - Write property-based test: for all county IDs in the original 32 county list, the fixed municipalities array returns the same records as the original
+  - Write unit test: all 9 original contact IDs are present with unchanged fields
+  - Write unit test: `recommendDepartment()` returns the same department ID for each of the four existing keyword queries above
+  - Verify all tests PASS on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS (this confirms baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.3, 3.6, 3.7, 3.8_
+
+- [-] 3. Fix: expand seed data and wire all dead UI
+
+  - [x] 3.1 Expand departments in `lib/seed-data.ts` — confirm 10 new departments are present
+    - Verify the following department IDs exist in the `departments` array: `finance`, `fire`, `police`, `parks`, `it`, `legal`, `hr`, `engineering`, `environment`, `community-dev`
+    - If any are missing, add them following the existing `DepartmentRecord` shape `{ id, name, slug, description }`
+    - The 10 new departments are already present in the current file per the design doc — this step is a confirmation pass
+    - Total department count after this step: 17
+    - _Bug_Condition: `isBugCondition` where `departments.length < 17` or required IDs are absent_
+    - _Expected_Behavior: `departments.length === 17` and all 17 IDs are present_
+    - _Preservation: existing 7 department records (`building`, `planning`, `public-works`, `clerk`, `procurement`, `health`, `education`) must remain unchanged_
+    - _Requirements: 2.10, 3.10_
+
+  - [x] 3.2 Expand counties in `lib/seed-data.ts` — add counties for all 50 states
+    - Add `CountyRecord` entries for the 40 states currently missing county data, following the shape `{ id, stateId, name, fips }` with kebab-case IDs in the format `{county-name}-{stateAbbr}`
+    - Minimum coverage: 3–5 representative counties per state (most populous or most commonly searched)
+    - States to add (see design doc for full county list per state): AL, AK, AZ, AR, CO, DE, HI, ID, IN, IA, KS, KY, LA, ME, MD, MI, MN, MS, MO, MT, NE, NV, NH, NM, NC, ND, OH, OK, OR, RI, SC, SD, TN, UT, VT, VA, WA, WV, WI, WY
+    - Also add additional counties for states with partial coverage: CA (San Diego, Orange, Riverside, San Bernardino, Santa Clara, Alameda, Sacramento), FL (Broward, Palm Beach, Hillsborough, Orange, Pinellas), GA (Gwinnett, Cobb, DeKalb, Cherokee, Forsyth), IL (DuPage, Lake, Will, Kane, McHenry), MA (Worcester, Suffolk, Essex, Norfolk, Bristol), NY (Kings, Queens, New York, Bronx, Richmond, Erie, Monroe, Onondaga), PA (Philadelphia, Allegheny, Bucks, Chester, Delaware), TX (Harris, Dallas, Bexar, Tarrant, Collin, Denton, Fort Bend)
+    - Do NOT modify or remove any of the 32 existing county records
+    - _Bug_Condition: `isEmptyCountyDropdown(stateId)` where stateId is not in the original 10_
+    - _Expected_Behavior: for all 50 state IDs, `counties.filter(c => c.stateId === stateId).length > 0`_
+    - _Preservation: all 32 original county records remain with identical `id`, `stateId`, `name`, and `fips` fields_
+    - _Requirements: 2.1, 3.1_
+
+  - [x] 3.3 Expand municipalities in `lib/seed-data.ts` — add municipalities for each new county
+    - For each new county added in 3.2, add 3–8 representative `MunicipalityRecord` entries following the shape `{ id, countyId, stateId, name, kind, placeFips }`
+    - Use real place names; `id` is kebab-case `{name}-{kind}`; `placeFips` may use placeholder pattern `{countyId}-{index}` for seed mode
+    - Do NOT modify or remove any of the existing municipality records (Bergen County's 70 entries and the 15 scattered entries)
+    - _Bug_Condition: `isEmptyMunicipalityDropdown(countyId)` where countyId is not in the original set_
+    - _Expected_Behavior: for all county IDs in the expanded `counties` array, `municipalities.filter(m => m.countyId === countyId).length > 0`_
+    - _Preservation: Bergen County NJ continues to list all 70 existing boroughs and townships; all 15 scattered municipality records remain unchanged_
+    - _Requirements: 2.2, 3.2_
+
+  - [x] 3.4 Expand `departmentKeywords` in `components/dashboard.tsx` — add entries for 10 new departments
+    - Add keyword arrays for the 10 new department IDs to the `departmentKeywords` record:
+      - `finance`: `["finance", "treasury", "budget", "accounting", "tax", "fiscal", "revenue", "audit"]`
+      - `fire`: `["fire", "firefighter", "fire department", "fire prevention", "fire code", "fire inspection", "emergency response"]`
+      - `police`: `["police", "public safety", "law enforcement", "sheriff", "emergency management", "security"]`
+      - `parks`: `["parks", "recreation", "park", "open space", "playground", "trails", "sports", "leisure"]`
+      - `it`: `["it", "technology", "tech", "digital", "software", "data", "systems", "cybersecurity", "network"]`
+      - `legal`: `["legal", "attorney", "city attorney", "counsel", "ordinance", "contract", "litigation"]`
+      - `hr`: `["human resources", "hr", "employment", "hiring", "benefits", "labor", "personnel", "workforce"]`
+      - `engineering`: `["engineering", "civil", "capital project", "infrastructure design", "survey", "drainage"]`
+      - `environment`: `["environmental", "sustainability", "recycling", "stormwater", "green", "conservation", "waste"]`
+      - `community-dev`: `["community development", "economic development", "housing", "grants", "community programs", "cdbg"]`
+    - Do NOT modify any of the 7 existing keyword arrays (`building`, `planning`, `public-works`, `clerk`, `procurement`, `health`, `education`)
+    - _Bug_Condition: `departmentKeywords` has no entry for new department IDs, so `recommendDepartment()` scores them as 0 for all queries_
+    - _Expected_Behavior: `recommendDepartment(departments, "fire code inspection")` returns `fire`; `recommendDepartment(departments, "budget audit")` returns `finance`_
+    - _Preservation: `recommendDepartment(departments, "flooring permit")` still returns `building`; all existing keyword queries return the same top-scored department as before_
+    - _Requirements: 2.10, 3.6_
+
+  - [x] 3.5 Wire search bar — add `searchQuery` state to `Dashboard`, pass to `TopBar`, filter contacts
+    - Add `const [searchQuery, setSearchQuery] = useState("")` to the `Dashboard` component
+    - Update `TopBar` function signature to accept `searchQuery: string` and `onSearchChange: (value: string) => void` props
+    - In `TopBar`, bind `value={searchQuery}` and `onChange={(e) => onSearchChange(e.target.value)}` to the `<input>` element
+    - Pass `searchQuery={searchQuery}` and `onSearchChange={setSearchQuery}` from `Dashboard` to `<TopBar />`
+    - Add a `displayContacts` derived value (or extend `filteredContacts`) that, when `searchQuery` is non-empty, further filters contacts whose `name`, municipality `name`, department `name`, or `email` includes `searchQuery.toLowerCase()`
+    - Pass `displayContacts` (not `filteredContacts` directly) to `<ContactsTable />`
+    - _Bug_Condition: `isInertSearchBar()` where `topBarInput.onChange IS NULL`_
+    - _Expected_Behavior: typing "Cambridge" in the search bar shows only contacts matching "Cambridge" in name, municipality, department, or email_
+    - _Preservation: when `searchQuery` is empty, `displayContacts` equals `filteredContacts` exactly — no change to existing filter behavior_
+    - _Requirements: 2.6, 3.3_
+
+  - [x] 3.6 Wire sidebar navigation — add `activePanel` state, pass to `SideNav`, conditionally render panels
+    - Add `const [activePanel, setActivePanel] = useState<"dashboard" | "contacts" | "tracking" | "verification" | "settings">("dashboard")` to `Dashboard`
+    - Define nav items with a `panel` field: `{ icon: Gauge, label: "Dashboard", panel: "dashboard" }`, `{ icon: Building2, label: "Contact Finder", panel: "contacts" }`, `{ icon: Inbox, label: "Response Tracking", panel: "tracking" }`, `{ icon: Database, label: "Data Verification", panel: "verification" }`, `{ icon: Settings, label: "Admin Settings", panel: "settings" }`
+    - Update `SideNav` to accept `activePanel` and `onNavChange` props; replace hardcoded `active: true` with `item.panel === activePanel`; add `onClick={() => onNavChange(item.panel)}` to each nav button
+    - In `<main>`, conditionally render panel groups based on `activePanel`:
+      - `"dashboard"` → current default layout (all panels visible)
+      - `"contacts"` → `FilterBar` + `IntentAssistant` + `DepartmentVerificationPanel` + `ContactsTable`
+      - `"tracking"` → `InboxPanel` + `MetricsPanel`
+      - `"verification"` → `DepartmentVerificationPanel` + `VerificationPanel`
+      - `"settings"` → a simple placeholder card: `<section className="col-span-12 ..."><h3>Admin Settings</h3><p>Coming soon.</p></section>`
+    - _Bug_Condition: `isDeadNavItem(navLabel)` where `navItem.onClick IS NULL` and `active IS HARDCODED`_
+    - _Expected_Behavior: clicking "Response Tracking" sets `activePanel` to `"tracking"` and renders `InboxPanel` + `MetricsPanel` as the primary content_
+    - _Preservation: default `activePanel` is `"dashboard"` so the initial render is identical to the current layout_
+    - _Requirements: 2.7, 3.9_
+
+  - [x] 3.7 Wire Sparkle button — add `onSparkle` handler, highlight top contact or show message
+    - Add `const [highlightedContactId, setHighlightedContactId] = useState<string | null>(null)` and `const [sparkleMessage, setSparkleMessage] = useState("")` to `Dashboard`
+    - Implement `handleSparkle` in `Dashboard`: if `displayContacts` has at least one result, set `highlightedContactId` to `displayContacts[0].id` and clear it after 2 seconds; otherwise set `sparkleMessage` to `"No verified contact found for the current filters."` and clear it after 3 seconds
+    - Update `FilterBar` to accept an `onSparkle: () => void` prop and wire it to the Sparkle `<button onClick={onSparkle}>`
+    - Pass `onSparkle={handleSparkle}` from `Dashboard` to `<FilterBar />`
+    - Pass `highlightedContactId` to `<ContactsTable />` and apply a highlight style (e.g., `ring-2 ring-primary`) to the matching row
+    - Render `sparkleMessage` as an inline notice below `<FilterBar />` when non-empty
+    - _Bug_Condition: `isDeadButton("sparkle")` where `button.onClick IS NULL`_
+    - _Expected_Behavior: clicking Sparkle with contacts in scope highlights the top contact row for 2 seconds; clicking with no contacts shows an inline message_
+    - _Preservation: the Sparkle button does not affect `filteredContacts`, `searchQuery`, or any dropdown state_
+    - _Requirements: 2.3, 3.3_
+
+  - [x] 3.8 Wire "View All" button — add `showAll` state to `ContactsTable`, toggle between 5 rows and all
+    - Move the `slice(0, 5)` logic from `Dashboard`'s prop-passing into `ContactsTable` so the button can control it locally
+    - In `Dashboard`, pass the full `displayContacts` (or `filteredContacts` for the non-lookup case) to `<ContactsTable />` without slicing
+    - Add `const [showAll, setShowAll] = useState(false)` inside `ContactsTable`
+    - When `readyForLookup` is false and `showAll` is false, display only the first 5 contacts; when `showAll` is true, display all
+    - Update the "View All" button: `onClick={() => setShowAll(v => !v)}` and label toggles between `"View All"` and `"Show Less"`
+    - _Bug_Condition: `isDeadButton("view-all")` where `button.onClick IS NULL`_
+    - _Expected_Behavior: table shows ≤5 rows by default; clicking "View All" shows all rows; clicking "Show Less" returns to 5 rows_
+    - _Preservation: when `readyForLookup` is true, all matching contacts are always shown (no cap) — this behavior is unchanged_
+    - _Requirements: 2.4, 3.3_
+
+  - [x] 3.9 Wire "Review Queue" button — navigate to verification panel
+    - Update `VerificationPanel` to accept an `onReviewQueue: () => void` prop and wire it to the "Review Queue" `<button onClick={onReviewQueue}>`
+    - Implement `handleReviewQueue` in `Dashboard`: set `activePanel` to `"verification"` and scroll the `DepartmentVerificationPanel` into view using `document.getElementById("verification-panel")?.scrollIntoView({ behavior: "smooth" })`
+    - Add `id="verification-panel"` to the `DepartmentVerificationPanel` wrapper `<section>` element
+    - Pass `onReviewQueue={handleReviewQueue}` from `Dashboard` to `<VerificationPanel />`
+    - _Bug_Condition: `isDeadButton("review-queue")` where `button.onClick IS NULL`_
+    - _Expected_Behavior: clicking "Review Queue" sets `activePanel` to `"verification"` and scrolls the verification panel into view_
+    - _Preservation: `DepartmentVerificationPanel` continues to show "Verified" / "Needs verification" per department based on existing contact data_
+    - _Requirements: 2.5, 3.10_
+
+  - [x] 3.10 Add "Sync Replies" button to `InboxPanel` — call `/api/email/sync`, show feedback
+    - Add `const [syncState, setSyncState] = useState<"idle" | "syncing" | "done" | "error">("idle")` inside `InboxPanel`
+    - Add a "Sync Replies" button with the `RefreshCw` icon to the `InboxPanel` header area, next to the title
+    - On click: set `syncState` to `"syncing"`, call `POST /api/email/sync`, then:
+      - On success: set `syncState` to `"done"`, show "Replies synced" inline for 2 seconds, then reset to `"idle"`
+      - On error: set `syncState` to `"error"`, show "Sync failed" inline for 2 seconds, then reset to `"idle"`
+    - Disable the button while `syncState === "syncing"` and show a spinner or "Syncing…" label
+    - The `/api/email/sync` route already exists at `app/api/email/sync/route.ts` — no new API route needed
+    - _Bug_Condition: `isDeadButton("sync-replies")` where no "Sync Replies" button exists in `InboxPanel`_
+    - _Expected_Behavior: clicking "Sync Replies" calls `POST /api/email/sync` and shows "Replies synced" or "Sync failed" feedback_
+    - _Preservation: existing thread list rendering and `ComposerDrawer` → send flow are unaffected_
+    - _Requirements: 2.9, 3.5_
+
+  - [x] 3.11 Load fonts — verify Google Fonts link tags in `app/layout.tsx`
+    - Open `app/layout.tsx` and confirm the `<head>` block already contains:
+      - `<link rel="preconnect" href="https://fonts.googleapis.com" />`
+      - `<link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />`
+      - `<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />`
+    - Per the design doc, this bug is already fixed — the link tags are present in the current file
+    - If for any reason they are absent, add them inside the `<head>` element before `</head>`
+    - No other changes to `app/layout.tsx` are needed
+    - _Bug_Condition: `isMissingFont()` where `layout.tsx CONTAINS NO googleFontsImport` — already resolved_
+    - _Expected_Behavior: Manrope and Inter load on every page render_
+    - _Preservation: no other layout changes; `<body>` and metadata remain unchanged_
+    - _Requirements: 2.8_
+
+  - [ ] 3.12 Verify bug condition exploration tests now pass
+    - **Property 1: Expected Behavior** - Geography Completeness, Button Handlers, Search, Nav, Departments
+    - **IMPORTANT**: Re-run the SAME tests from task 1 — do NOT write new tests
+    - The tests from task 1 encode the expected behavior; when they pass, the fix is confirmed
+    - Run all six exploration tests (1a–1f) against the fixed code
+    - **EXPECTED OUTCOME**: All tests PASS (confirms all bugs are fixed)
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.9, 2.10_
+
+  - [ ] 3.13 Verify preservation tests still pass
+    - **Property 2: Preservation** - Existing Geography, Contacts, Email Flow, Keyword Scoring
+    - **IMPORTANT**: Re-run the SAME tests from task 2 — do NOT write new tests
+    - Run all preservation tests against the fixed code
+    - **EXPECTED OUTCOME**: All tests PASS (confirms no regressions)
+    - Confirm: existing 10-state county data unchanged, Bergen County 70 municipalities unchanged, 9 contact records unchanged, keyword scoring unchanged for existing queries
+    - _Requirements: 3.1, 3.2, 3.3, 3.6, 3.7, 3.8_
+
+- [ ] 4. Checkpoint — Ensure all tests pass
+  - Run the full test suite and confirm all tests pass
+  - Manually verify the filter chain end-to-end: select a state not in the original 10 (e.g., "Texas") → select a county → select a municipality → select a department → confirm no crash and contacts table renders
+  - Manually verify search: type "Hackensack" in the top bar → confirm only Hackensack contacts are visible
+  - Manually verify sidebar nav: click "Response Tracking" → confirm `InboxPanel` and `MetricsPanel` are the primary content
+  - Manually verify Sparkle: select all four filters with a matching contact → click ✨ → confirm top contact row is highlighted
+  - Manually verify View All: confirm table shows ≤5 rows by default → click "View All" → confirm all rows shown → click "Show Less" → confirm back to 5
+  - Manually verify Review Queue: click "Review Queue" → confirm verification panel is activated and scrolled into view
+  - Manually verify Sync Replies: click "Sync Replies" → confirm button shows "Syncing…" then "Replies synced" feedback
+  - Ask the user if any questions arise before marking complete

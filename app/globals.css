@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #faf9fe;
+  color: #1a1b1f;
+  overflow-x: hidden;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+button,
+select,
+textarea,
+input {
+  font: inherit;
+}
+
+.glass {
+  background: rgb(255 255 255 / 0.72);
+  border: 1px solid rgb(255 255 255 / 0.5);
+  backdrop-filter: blur(20px) saturate(180%);
+}
+
+.focus-ring {
+  outline: none;
+}
+
+.focus-ring:focus-visible {
+  box-shadow: 0 0 0 3px rgb(0 88 188 / 0.18);
+}

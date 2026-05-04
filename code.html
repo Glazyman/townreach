@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TownConnect Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-surface": "#1a1b1f",
+                    "background": "#faf9fe",
+                    "primary-fixed-dim": "#adc6ff",
+                    "surface": "#faf9fe",
+                    "surface-container": "#eeedf3",
+                    "surface-container-lowest": "#ffffff",
+                    "primary-container": "#0070eb",
+                    "on-primary-fixed-variant": "#004493",
+                    "secondary-container": "#6664e4",
+                    "tertiary-fixed": "#ffdbcc",
+                    "on-background": "#1a1b1f",
+                    "secondary-fixed-dim": "#c2c1ff",
+                    "on-error-container": "#93000a",
+                    "error-container": "#ffdad6",
+                    "on-primary-container": "#fefcff",
+                    "inverse-surface": "#2f3034",
+                    "surface-container-low": "#f4f3f8",
+                    "on-tertiary-fixed": "#351000",
+                    "secondary-fixed": "#e2dfff",
+                    "on-surface-variant": "#414755",
+                    "on-tertiary-fixed-variant": "#7c2e00",
+                    "inverse-on-surface": "#f1f0f5",
+                    "on-error": "#ffffff",
+                    "secondary": "#4c4aca",
+                    "primary-fixed": "#d8e2ff",
+                    "inverse-primary": "#adc6ff",
+                    "surface-dim": "#dad9df",
+                    "tertiary-container": "#c64f00",
+                    "on-secondary-container": "#fffbff",
+                    "surface-container-high": "#e9e7ed",
+                    "surface-tint": "#005bc1",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-fixed": "#001a41",
+                    "primary": "#0058bc",
+                    "surface-bright": "#faf9fe",
+                    "outline-variant": "#c1c6d7",
+                    "on-secondary": "#ffffff",
+                    "error": "#ba1a1a",
+                    "on-secondary-fixed-variant": "#3631b4",
+                    "tertiary": "#9e3d00",
+                    "on-tertiary-container": "#fffbff",
+                    "tertiary-fixed-dim": "#ffb595",
+                    "on-primary": "#ffffff",
+                    "surface-container-highest": "#e3e2e7",
+                    "surface-variant": "#e3e2e7",
+                    "on-secondary-fixed": "#0c006a",
+                    "outline": "#717786"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "16px",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xl": "48px",
+                    "xs": "4px",
+                    "sm": "8px",
+                    "md": "16px",
+                    "container-max": "1200px",
+                    "unit": "8px",
+                    "gutter": "20px",
+                    "lg": "24px"
+            },
+            "fontFamily": {
+                    "label-caps": ["Inter"],
+                    "headline-md": ["Manrope"],
+                    "title-sm": ["Manrope"],
+                    "body-rg": ["Inter"],
+                    "display-lg": ["Manrope"],
+                    "body-sm": ["Inter"]
+            },
+            "fontSize": {
+                    "label-caps": ["12px", {"lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "headline-md": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "title-sm": ["20px", {"lineHeight": "1.4", "letterSpacing": "0", "fontWeight": "600"}],
+                    "body-rg": ["16px", {"lineHeight": "1.5", "letterSpacing": "0", "fontWeight": "400"}],
+                    "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-sm": ["14px", {"lineHeight": "1.5", "letterSpacing": "0", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .glass {
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+        }
+        body {
+            background-color: #faf9fe;
+            color: #1a1b1f;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="font-body-rg antialiased overflow-x-hidden">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-full w-64 border-r border-white/20 dark:border-slate-800/30 bg-white/60 dark:bg-slate-950/60 backdrop-blur-2xl saturate-180 shadow-2xl shadow-blue-900/5 flex flex-col gap-2 p-6 z-50">
+<div class="mb-xl px-2">
+<h1 class="text-lg font-black tracking-tighter text-slate-800 dark:text-slate-100 font-headline-md">City of Metropol</h1>
+<p class="text-[10px] text-slate-500 font-label-caps uppercase">Official Outreach Portal</p>
+</div>
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-lg shadow-inner font-manrope text-sm font-semibold transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-800/40 rounded-lg font-manrope text-sm font-medium transition-all active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="diversity_3">diversity_3</span>
+<span>Citizen Outreach</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-800/40 rounded-lg font-manrope text-sm font-medium transition-all active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="calendar_today">calendar_today</span>
+<span>Public Events</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-800/40 rounded-lg font-manrope text-sm font-medium transition-all active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="insights">insights</span>
+<span>Data Analytics</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-800/40 rounded-lg font-manrope text-sm font-medium transition-all active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="settings_applications">settings_applications</span>
+<span>Admin Settings</span>
+</a>
+</div>
+<div class="mt-auto">
+<button class="w-full bg-primary text-white py-3 px-4 rounded-xl font-manrope text-sm font-semibold shadow-lg shadow-primary/20 hover:bg-primary-container transition-all active:scale-95">
+                Create New Campaign
+            </button>
+</div>
+</nav>
+<!-- TopAppBar -->
+<header class="fixed top-0 right-0 h-16 w-[calc(100%-16rem)] ml-64 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border-b border-white/30 dark:border-slate-800/50 flex items-center justify-between px-8 z-40 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] backdrop-saturate-150">
+<div class="flex-1 max-w-xl">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" data-icon="search">search</span>
+<input class="w-full bg-slate-100 border-none rounded-full py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all" placeholder="Search municipal records..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<button class="text-slate-500 hover:text-primary transition-colors relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-0 right-0 w-2 h-2 bg-red-500 border-2 border-white rounded-full"></span>
+</button>
+<button class="text-slate-500 hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+<div class="flex items-center gap-3 pl-4 border-l border-slate-200">
+<div class="text-right hidden lg:block">
+<p class="text-xs font-bold text-slate-900">Alex Rivers</p>
+<p class="text-[10px] text-slate-500 font-medium">Administrator</p>
+</div>
+<img alt="Administrator Profile" class="w-8 h-8 rounded-full border border-slate-200" data-alt="A professional headshot of a modern government administrator with a friendly expression. The background is a soft-focus office environment with clean white walls and natural daylight, matching the light-mode UI aesthetic of CivicPulse. The lighting is balanced and crisp, evoking a premium digital serene atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAJvA8JQvWFeAUSatps-lVF973wEL225GumT22E9W3Hb3pOI1R9GSE_OcEh-gAn_eAbDFR98gX-cwLmgY-SYYR5gtOWyYya7HcLCnVS20Yddbpwoy8dkjfNc4E_uvEjTViwN5aXkDK7xpMCrSxQAp4EVj17xb2BvBjENaIV1xkbpQdSoji6Xl3ZXjcLBgU6ZRxbJM7YLsTxXaBjosZ8mfqBGrVfTAp8YO_O10KKdjluMRtQQOQRjicAeQRE_i61GCRfheLF__pnrRpL"/>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="ml-64 pt-24 px-8 pb-xl min-h-screen">
+<!-- Header -->
+<header class="mb-xl">
+<h2 class="font-display-lg text-display-lg text-slate-900 tracking-tight">Municipal Outreach</h2>
+<p class="font-body-rg text-slate-500 mt-2 max-w-2xl">Connect with local representatives, manage community engagement programs, and track municipal touchpoints across the Metropol metropolitan area.</p>
+</header>
+<!-- Bento Grid Layout for Dashboard Content -->
+<div class="grid grid-cols-12 gap-lg">
+<!-- Filter Bar -->
+<section class="col-span-12 bg-white rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white p-4 flex flex-wrap items-center gap-4">
+<div class="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-lg border border-slate-100 flex-1 min-w-[150px]">
+<span class="text-xs font-semibold text-slate-400 font-label-caps">STATE</span>
+<select class="bg-transparent border-none text-sm font-medium focus:ring-0 p-0 w-full text-slate-800">
+<option>New York</option>
+</select>
+</div>
+<div class="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-lg border border-slate-100 flex-1 min-w-[150px]">
+<span class="text-xs font-semibold text-slate-400 font-label-caps">COUNTY</span>
+<select class="bg-transparent border-none text-sm font-medium focus:ring-0 p-0 w-full text-slate-800">
+<option>Manhattan</option>
+</select>
+</div>
+<div class="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-lg border border-slate-100 flex-1 min-w-[150px]">
+<span class="text-xs font-semibold text-slate-400 font-label-caps">CITY</span>
+<select class="bg-transparent border-none text-sm font-medium focus:ring-0 p-0 w-full text-slate-800">
+<option>New York City</option>
+</select>
+</div>
+<div class="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-lg border border-slate-100 flex-1 min-w-[150px]">
+<span class="text-xs font-semibold text-slate-400 font-label-caps">TOWN</span>
+<select class="bg-transparent border-none text-sm font-medium focus:ring-0 p-0 w-full text-slate-800">
+<option>Upper West Side</option>
+</select>
+</div>
+<button class="bg-slate-900 text-white p-3 rounded-lg hover:bg-slate-800 transition-colors shadow-lg shadow-slate-200">
+<span class="material-symbols-outlined text-sm" data-icon="tune">tune</span>
+</button>
+</section>
+<!-- Analytics Chart -->
+<section class="col-span-12 lg:col-span-4 bg-white rounded-xl border border-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] h-full">
+<div class="flex items-center justify-between mb-8">
+<h3 class="font-title-sm text-slate-900">Engagement Analytics</h3>
+<span class="text-xs font-bold text-primary bg-primary/5 px-2 py-1 rounded">+12.5%</span>
+</div>
+<div class="flex items-end justify-between h-48 gap-2">
+<div class="w-full bg-slate-100 rounded-t-md relative group">
+<div class="absolute bottom-0 w-full bg-primary rounded-t-md h-[40%] group-hover:h-[45%] transition-all duration-300"></div>
+<span class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-slate-400">MON</span>
+</div>
+<div class="w-full bg-slate-100 rounded-t-md relative group">
+<div class="absolute bottom-0 w-full bg-primary rounded-t-md h-[70%] group-hover:h-[75%] transition-all duration-300"></div>
+<span class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-slate-400">TUE</span>
+</div>
+<div class="w-full bg-slate-100 rounded-t-md relative group">
+<div class="absolute bottom-0 w-full bg-primary rounded-t-md h-[55%] group-hover:h-[60%] transition-all duration-300"></div>
+<span class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-slate-400">WED</span>
+</div>
+<div class="w-full bg-slate-100 rounded-t-md relative group">
+<div class="absolute bottom-0 w-full bg-primary rounded-t-md h-[90%] group-hover:h-[95%] transition-all duration-300"></div>
+<span class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-slate-400">THU</span>
+</div>
+<div class="w-full bg-slate-100 rounded-t-md relative group">
+<div class="absolute bottom-0 w-full bg-primary rounded-t-md h-[65%] group-hover:h-[70%] transition-all duration-300"></div>
+<span class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-slate-400">FRI</span>
+</div>
+</div>
+<div class="mt-xl pt-6 border-t border-slate-50">
+<div class="flex justify-between items-center text-sm">
+<span class="text-slate-500">Active Outreach</span>
+<span class="font-bold text-slate-900">1,248</span>
+</div>
+</div>
+</section>
+<!-- Table Section -->
+<section class="col-span-12 lg:col-span-8 bg-white rounded-xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden">
+<div class="p-6 border-b border-slate-50 flex items-center justify-between">
+<h3 class="font-title-sm text-slate-900">Active Contacts</h3>
+<button class="text-primary font-semibold text-sm hover:underline">View All</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead>
+<tr class="bg-slate-50/50">
+<th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Town Name</th>
+<th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Department</th>
+<th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Contact</th>
+<th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-50">
+<!-- Row 1 -->
+<tr class="hover:bg-slate-50 transition-colors group">
+<td class="px-6 py-5">
+<p class="font-semibold text-slate-800">Scarsdale Village</p>
+<p class="text-xs text-slate-400">Westchester, NY</p>
+</td>
+<td class="px-6 py-5">
+<span class="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold border border-blue-100/50">Infrastructure</span>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<img alt="Contact Person" class="w-8 h-8 rounded-full border border-white shadow-sm" data-alt="A clean, professional portrait of a male urban planner in a minimalist office. The image has a high-key, airy aesthetic with neutral backgrounds and bright daylight, reflecting a sense of trustworthiness and professional clarity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCDa81wJhyAo_8CvNDwlXhP-VNnZpAVGns0og8kYJVe5FvPdFMKCrgeqGj7Z7npeY20cxwOqFPkKfoIkq5jNzo90TPDuQ7AtsGtEHbKcD2KKZcyNQIVhdanRP_ljumZCj4L9_y4TLcDLNwdoVTyaYlG3HI8V3Dm1hdswU5wXlyqx2qhxMSUoAvJ6M3QMUqDH8RYsXDHgyOR1Az3IhXwr5VL0DvtVzGOm7iqSY6u1mcn-QnfZK-wFc623Ik7TncoETWHopT2ls-wNsey"/>
+<div>
+<p class="text-sm font-semibold text-slate-800">Marcus Chen</p>
+<p class="text-xs text-slate-500">Director</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<button class="flex items-center justify-center w-8 h-8 rounded-full bg-primary/5 text-primary hover:bg-primary hover:text-white transition-all">
+<span class="material-symbols-outlined text-sm" data-icon="mail">mail</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-slate-50 transition-colors group">
+<td class="px-6 py-5">
+<p class="font-semibold text-slate-800">Montclair Township</p>
+<p class="text-xs text-slate-400">Essex, NJ</p>
+</td>
+<td class="px-6 py-5">
+<span class="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold border border-emerald-100/50">Public Health</span>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<img alt="Contact Person" class="w-8 h-8 rounded-full border border-white shadow-sm" data-alt="A professional portrait of a female public health officer in a bright, modern clinic environment. Soft, diffused lighting and a minimalist aesthetic underscore the high-fidelity UI design. The mood is calm, professional, and sophisticated." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDbnHcyBC3n2PHhKdz71BHYQI-GXB8dU4A8eX1Dmq2NUFOxp6TMRLHfjAa6svQ09HroK5WBtqm06QzO8V_k6riOqJFuaNmhpy7NwTzCX8ccePPvy8PBD9wmUxIBM3JXRkxYqXBCz8BgQtwjTO2MgpqrS-gkeTKCP-JVIXOXvb-_eL37zjsqSzZIJ3nkN4TFVrLYSZFYcEeRoKGQLJTYDXu3LvFrawI_8-yfLrP_qtU39TbALtJcCagwGE80q7dzRwm-3OZmNWNuQksO"/>
+<div>
+<p class="text-sm font-semibold text-slate-800">Sarah Jenkins</p>
+<p class="text-xs text-slate-500">Coordinator</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<button class="flex items-center justify-center w-8 h-8 rounded-full bg-primary/5 text-primary hover:bg-primary hover:text-white transition-all">
+<span class="material-symbols-outlined text-sm" data-icon="mail">mail</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-slate-50 transition-colors group">
+<td class="px-6 py-5">
+<p class="font-semibold text-slate-800">Bronxville</p>
+<p class="text-xs text-slate-400">Westchester, NY</p>
+</td>
+<td class="px-6 py-5">
+<span class="px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-xs font-bold border border-amber-100/50">Education</span>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<img alt="Contact Person" class="w-8 h-8 rounded-full border border-white shadow-sm" data-alt="A minimalist headshot of a male school board member in a library-like setting with soft focus and high-key lighting. The overall visual style is clean, modern, and perfectly aligned with a premium digital dashboard aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBizuJqsY3VxUutYOB8run-MBdfLGu-RHW9JycjUeorU-qBOmcEIEOzISY_aNLoCU7lTmdfPvDLLTc09fG4Dc55wIbrT4QQD1sSK7usV7SUj0Tv4QmY7LnX8eZEeDSJiWv8UR7twfh2EIXCoBT5JwmcARWXci89bUl6EfOn49FaoO1IlUmhWt84UvyPWyHGsjbkTlXTMBBTtLNva3XMui3SZJec7B0yiy1VbotduM4wHNdt89tneHMX5Pr61nu0PfkDOGxUUCrgs99U"/>
+<div>
+<p class="text-sm font-semibold text-slate-800">David Ross</p>
+<p class="text-xs text-slate-500">Board Member</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<button class="flex items-center justify-center w-8 h-8 rounded-full bg-primary/5 text-primary hover:bg-primary hover:text-white transition-all">
+<span class="material-symbols-outlined text-sm" data-icon="mail">mail</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<!-- Bottom Highlights (Bento Style) -->
+<section class="col-span-12 md:col-span-4 bg-primary text-white rounded-xl p-8 shadow-xl shadow-primary/20 relative overflow-hidden group">
+<div class="relative z-10">
+<h4 class="font-headline-md text-xl mb-2">Campaign Impact</h4>
+<p class="text-primary-fixed-dim text-sm mb-6">Your recent outreach campaign reached 14,000 residents across the district.</p>
+<button class="bg-white text-primary px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-black/5 hover:bg-slate-50 transition-all">
+                        View Report
+                    </button>
+</div>
+<!-- Abstract Design Decor -->
+<div class="absolute -right-12 -bottom-12 w-48 h-48 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-700"></div>
+<div class="absolute -left-6 -top-6 w-24 h-24 bg-white/5 rounded-full blur-2xl"></div>
+</section>
+<section class="col-span-12 md:col-span-4 bg-surface-container-low rounded-xl p-8 border border-white shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+<div class="flex items-center gap-4 mb-6">
+<div class="w-12 h-12 rounded-full bg-secondary-container/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary-container" data-icon="event">event</span>
+</div>
+<div>
+<h4 class="font-title-sm text-slate-900">Upcoming Meet</h4>
+<p class="text-xs text-slate-500">Tomorrow at 10:00 AM</p>
+</div>
+</div>
+<p class="text-sm text-slate-600 mb-6">Town Hall meeting regarding the new West-side park development project.</p>
+<div class="flex -space-x-2">
+<img alt="Avatar" class="w-8 h-8 rounded-full border-2 border-white" data-alt="A series of three minimalist user profile avatars displayed in a row, with soft studio lighting and diverse representation. The style is consistent with high-end glassmorphic UI design, emphasizing professional clarity and Serenity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDAuG3l2Cb8iwNuagWa_MmqrbbcZjVzja9ZmpiQGl4oUWwyY4QZYr_NmF0it0GPWjbmuJo5UUcpZvAIJPxoT8yCGKM3WMEVIFfCxDQ67UOurwAMpspfxfxBXGc6LbZx1fLNVhUSb9peLdu4fYa6rosb-52sbcp8-NEqnKfOjtIDeozX8KDOHajBW5E2iuACUenDRrQUlkJA7MJEOZgLNXsP_fqqOdr7ZkGJoud7w45yrvVimXF-2q3pQrcibY7jrsJ4O2cZfOLJSZbk"/>
+<img alt="Avatar" class="w-8 h-8 rounded-full border-2 border-white" data-alt="A series of three minimalist user profile avatars displayed in a row, with soft studio lighting and diverse representation. The style is consistent with high-end glassmorphic UI design, emphasizing professional clarity and Serenity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCZ6Qz52ZxHYZW1pwL8_D_9b0YTrTbQQ502ljBuilp3H9e8ZXwwYX7w7TatAe3O-QxlxpA_G9ULOlvsMOY7mkpbdtGDNclNFxLaYwV7yxO4MSjzsIRMJq_zxNqCG0Y5rydNtfr5QySz4yxcXbJev-qstUi3J6QONy_zrAkmUwnM5fzUwwhZzImNw1YCcILN6BhhgB0eoz1hqgW3vY0QjyC7lj3VinbuDbBwjhWrhTQ_phASaXDPBfrPMxnB-dZYGZCRqWYH_EkZAge6"/>
+<img alt="Avatar" class="w-8 h-8 rounded-full border-2 border-white" data-alt="A series of three minimalist user profile avatars displayed in a row, with soft studio lighting and diverse representation. The style is consistent with high-end glassmorphic UI design, emphasizing professional clarity and Serenity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAD-rncTYWs04mmowGDUmJZAhBwlpEa54SgTvmw9zIp79PSYLAETl0STfl_9Z0TjG-FQuUwxu2RxCcXbW_0a8ERx4oH8P6nAaPJiFDbjQN1ES6DpLuI-bLawL2fDXGRm1CsYymFct1ZEpTWCJWwcUjLLCNIf-sOv2zIs62n2FZTlTrvv-Pr_4MpCFOsz3x_jlEqwL_B7UwAWFRbsFax4h47kLfH15C9JXAp9adWh4Ikw5ZWz2svKeQRo5se7PZE-ZRDOx3F1wimC0hC"/>
+<div class="w-8 h-8 rounded-full bg-white border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-400">+12</div>
+</div>
+</section>
+<section class="col-span-12 md:col-span-4 bg-white rounded-xl p-8 border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+<div class="flex flex-col h-full justify-between">
+<div>
+<h4 class="font-title-sm text-slate-900 mb-2">Regional Map</h4>
+<p class="text-sm text-slate-500">Active municipal touchpoints currently visualized in real-time.</p>
+</div>
+<div class="mt-4 rounded-lg overflow-hidden h-32 relative">
+<img alt="Map" class="w-full h-full object-cover grayscale opacity-50" data-alt="A stylized, minimalist architectural map of a metropolitan area with clean line work and a monochromatic grey palette. The image has a high-end architectural feel, punctuated by subtle blue glowing nodes representing active touchpoints, perfectly fitting the digital serenity of CivicPulse." data-location="New York City" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBtL-btY7VZ2v6Tvn7prvcHvbrWaR1fu-ETBWpu-DyybfbnAEvmbXae0mM5Qc6ZoA4wWQLNL_Z6Bdh_DtaGhoNk1s8iXEgmdAMhP4JjF806bxliGm05ZqrUwFNNUVEOUtFffIVxexLZdO7O4dj21Z1UsYJw6L-6zPw4uC8rrbmPHuigJvoQXDdwo3QICaIr5lsCHnTZsWbZSIRXD0wnCAFawipLe4KsRDN4OBQB5q4XQdzk-dZUxTEdtBwy_-iTeZklkZ4DFa3MnOrL"/>
+<div class="absolute inset-0 bg-gradient-to-t from-white/80 to-transparent"></div>
+</div>
+</div>
+</section>
+</div>
+</main>
+</body></html>

@@ -1,0 +1,8 @@
+import type { EmailTemplate } from "./types";
+
+export const emailTemplates: EmailTemplate[] = [
+  { id: "building-permit", name: "Building department inquiry", subject: "Question about {{municipality}} permit requirements", body: "Hi {{contactName}},\n\nI'm reaching out on behalf of {{companyName}}. We are trying to confirm the best process for flooring-related permit or inspection requirements in {{municipality}}.\n\nCould you point me to the right requirements or contact if your department does not handle this directly?\n\nThank you,\n{{senderName}}" },
+  { id: "records-request", name: "Public records/list request", subject: "Request for municipal list or department contact", body: "Hi {{contactName}},\n\nI'm looking for the appropriate department contact or public list related to {{departmentName}} in {{municipality}}.\n\nIf this should be requested through another office or portal, please let me know where to submit it.\n\nThank you,\n{{senderName}}" },
+  { id: "vendor-intro", name: "Vendor introduction", subject: "{{companyName}} introduction for {{municipality}}", body: "Hi {{contactName}},\n\nI wanted to introduce {{companyName}} and ask whether your office keeps a vendor list or procurement contact for {{departmentName}} needs.\n\nI'd appreciate any guidance on the right next step.\n\nBest,\n{{senderName}}" },
+  { id: "follow-up", name: "Follow-up", subject: "Following up on {{departmentName}} inquiry", body: "Hi {{contactName}},\n\nI'm following up on my earlier note about {{departmentName}} in {{municipality}}. Any direction you can share would be appreciated.\n\nThank you,\n{{senderName}}" }
+];

@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+
+# next
+.next/
+out/
+
+# env (never commit secrets)
+.env
+.env.local
+.env.*.local
+
+# gmail oauth token store (local only)
+.data/
+
+# debug / os
+npm-debug.log*
+.DS_Store
+*.pem
+
+# typescript
+*.tsbuildinfo
+
+# ide
+.idea/
+.vscode/
