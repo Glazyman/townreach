@@ -13,11 +13,14 @@ import {
   Mail,
   Map,
   Menu,
+  Plus,
   RefreshCw,
+  RotateCcw,
   Search,
   Send,
   Settings,
   Sparkles,
+  Trash2,
   X
 } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -27,9 +30,17 @@ const CoverageMap = dynamic(
   () => import("@/components/coverage-map").then((m) => m.CoverageMap),
   { ssr: false }
 );
-import { emailTemplates } from "@/lib/seed-data";
 import { tokenReplace } from "@/lib/data";
-import type { ContactRecord, CountyRecord, DashboardData, DepartmentRecord, MunicipalityRecord, OutreachThread } from "@/lib/types";
+import { getDefaultEmailTemplates, loadStoredEmailTemplates, saveStoredEmailTemplates } from "@/lib/email-templates-storage";
+import type {
+  ContactRecord,
+  CountyRecord,
+  DashboardData,
+  DepartmentRecord,
+  EmailTemplate,
+  MunicipalityRecord,
+  OutreachThread
+} from "@/lib/types";
 
 type DashboardProps = { data: DashboardData };
 type SendState = "idle" | "sending" | "sent" | "error";
@@ -154,6 +165,19 @@ export function Dashboard({ data }: DashboardProps) {
   const [pastSearchesHydrated, setPastSearchesHydrated] = useState(false);
   const [emailSettings, setEmailSettings] = useState<EmailConnectionSettings>(defaultEmailSettings);
   const [emailSettingsHydrated, setEmailSettingsHydrated] = useState(false);
+  const [emailTemplatesList, setEmailTemplatesList] = useState<EmailTemplate[]>(() => getDefaultEmailTemplates());
+  const [emailTemplatesHydrated, setEmailTemplatesHydrated] = useState(false);
+
+  useEffect(() => {
+    const stored = loadStoredEmailTemplates();
+    if (stored) setEmailTemplatesList(stored);
+    setEmailTemplatesHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!emailTemplatesHydrated) return;
+    saveStoredEmailTemplates(emailTemplatesList);
+  }, [emailTemplatesList, emailTemplatesHydrated]);
 
   useEffect(() => {
     try {
@@ -705,6 +729,7 @@ export function Dashboard({ data }: DashboardProps) {
                     {emailSettings.gmailConnected || emailSettings.outlookConnected ? "At least one provider connected" : "No providers connected"}
                   </span>
                 </p>
+                <EmailTemplatesPanel templates={emailTemplatesList} onChange={setEmailTemplatesList} />
               </section>
             )}
 
@@ -734,8 +759,128 @@ export function Dashboard({ data }: DashboardProps) {
           setMobileNavOpen(false);
           setActivePanel("settings");
         }}
+        templates={emailTemplatesList}
         onThreadCreated={(thread) => setThreads((current) => [thread, ...current])}
       />
+    </div>
+  );
+}
+
+function EmailTemplatesPanel({
+  templates,
+  onChange
+}: {
+  templates: EmailTemplate[];
+  onChange: (next: EmailTemplate[]) => void;
+}) {
+  function updateAt(index: number, patch: Partial<EmailTemplate>) {
+    onChange(templates.map((t, i) => (i === index ? { ...t, ...patch } : t)));
+  }
+
+  function removeAt(index: number) {
+    if (templates.length <= 1) return;
+    onChange(templates.filter((_, i) => i !== index));
+  }
+
+  function addTemplate() {
+    const id =
+      typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `custom-${Date.now()}`;
+    onChange([
+      ...templates,
+      {
+        id,
+        name: "New template",
+        subject: "Regarding {{municipality}}",
+        body: "Hi {{contactName}},\n\n\n\nThank you,\n{{senderName}}"
+      }
+    ]);
+  }
+
+  function resetDefaults() {
+    if (
+      !window.confirm(
+        "Replace all templates with TownReach defaults? Custom templates you added or edited here will be lost."
+      )
+    ) {
+      return;
+    }
+    onChange(getDefaultEmailTemplates());
+  }
+
+  return (
+    <div className="mt-10 border-t border-slate-100 pt-8">
+      <h4 className="font-display text-lg font-semibold text-slate-900">Email templates</h4>
+      <p className="mt-2 text-sm leading-6 text-slate-500">
+        Create and edit templates used in the email composer. Placeholders:{" "}
+        <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-800">{"{{contactName}}"}</code>{" "}
+        <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-800">{"{{companyName}}"}</code>{" "}
+        <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-800">{"{{senderName}}"}</code>{" "}
+        <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-800">{"{{municipality}}"}</code>{" "}
+        <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-800">{"{{departmentName}}"}</code>
+        . Defaults include <span className="font-semibold text-slate-700">OPRA</span> (New Jersey open records) and{" "}
+        <span className="font-semibold text-slate-700">FOIL</span> (New York freedom of information) starters—edit the bracketed parts before sending.
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={addTemplate}
+          className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-xl border border-primary bg-primary px-4 py-2 text-sm font-bold text-white transition hover:bg-primary-container"
+        >
+          <Plus size={16} aria-hidden />
+          Add template
+        </button>
+        <button
+          type="button"
+          onClick={resetDefaults}
+          className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+        >
+          <RotateCcw size={16} aria-hidden />
+          Reset to defaults
+        </button>
+      </div>
+      <div className="mt-5 space-y-4">
+        {templates.map((tpl, index) => (
+          <div key={tpl.id} className="rounded-xl border border-slate-200 bg-slate-50/90 p-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <label className="block min-w-0 flex-1">
+                <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Template name</span>
+                <input
+                  value={tpl.name}
+                  onChange={(e) => updateAt(index, { name: e.target.value })}
+                  className="focus-ring mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => removeAt(index)}
+                disabled={templates.length <= 1}
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 self-start rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label={`Delete template ${tpl.name}`}
+              >
+                <Trash2 size={14} aria-hidden />
+                Delete
+              </button>
+            </div>
+            <label className="mt-3 block">
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Subject</span>
+              <input
+                value={tpl.subject}
+                onChange={(e) => updateAt(index, { subject: e.target.value })}
+                className="focus-ring mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+              />
+            </label>
+            <label className="mt-3 block">
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Body</span>
+              <textarea
+                value={tpl.body}
+                onChange={(e) => updateAt(index, { body: e.target.value })}
+                rows={10}
+                className="focus-ring mt-1 w-full resize-y rounded-lg border border-slate-200 bg-white p-3 font-mono text-sm leading-6 text-slate-800"
+              />
+            </label>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1566,6 +1711,7 @@ function ComposerDrawer({
   emailSettings,
   onClose,
   onOpenEmailSettings,
+  templates,
   onThreadCreated
 }: {
   open: boolean;
@@ -1575,16 +1721,24 @@ function ComposerDrawer({
   emailSettings: EmailConnectionSettings;
   onClose: () => void;
   onOpenEmailSettings: () => void;
+  templates: EmailTemplate[];
   onThreadCreated: (thread: OutreachThread) => void;
 }) {
-  const [templateId, setTemplateId] = useState(emailTemplates[0].id);
+  const firstId = templates[0]?.id ?? "";
+  const [templateId, setTemplateId] = useState(firstId);
   const [provider, setProvider] = useState<"gmail" | "outlook">("gmail");
   const [sendState, setSendState] = useState<SendState>("idle");
   const [sendErrorDetail, setSendErrorDetail] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
 
-  const template = emailTemplates.find((t) => t.id === templateId) ?? emailTemplates[0];
+  useEffect(() => {
+    if (!templates.length) return;
+    if (!templates.some((t) => t.id === templateId)) {
+      setTemplateId(templates[0].id);
+    }
+  }, [templates, templateId]);
+
   const isProviderConnected = provider === "gmail" ? emailSettings.gmailConnected : emailSettings.outlookConnected;
   const variables = useMemo(() => ({
     contactName: contact?.name,
@@ -1594,11 +1748,13 @@ function ComposerDrawer({
   }), [contact?.name, department?.name, emailSettings.senderCompany, emailSettings.senderName, municipality?.name]);
 
   useEffect(() => {
-    setSubject(tokenReplace(template.subject, variables));
-    setBody(tokenReplace(template.body, variables));
+    const t = templates.find((x) => x.id === templateId) ?? templates[0];
+    if (!t) return;
+    setSubject(tokenReplace(t.subject, variables));
+    setBody(tokenReplace(t.body, variables));
     setSendState("idle");
     setSendErrorDetail("");
-  }, [template.body, template.subject, templateId, contact?.id, variables]);
+  }, [templates, templateId, contact?.id, variables]);
 
   async function sendEmail() {
     if (!contact || !department || !municipality || !isProviderConnected) return;
@@ -1736,9 +1892,20 @@ function ComposerDrawer({
               <label className="mt-5 block">
                 <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Template</span>
                 <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className="focus-ring mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold">
-                  {emailTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
                 </select>
               </label>
+              <p className="mt-2 text-xs text-slate-500">
+                Edit templates in{" "}
+                <button type="button" onClick={onOpenEmailSettings} className="font-semibold text-primary underline-offset-2 hover:underline">
+                  Admin Settings
+                </button>
+                .
+              </p>
               <label className="mt-5 block">
                 <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Subject</span>
                 <input value={subject} onChange={(e) => setSubject(e.target.value)} className="focus-ring mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 text-sm" />
