@@ -1073,53 +1073,85 @@ function FilterBar(props: {
   const townDisabled = !props.countyId || props.placesLoading;
   const deptDisabled = !props.municipalityId;
   const searchDisabled = props.searchDisabled ?? false;
+  const searchLabelShort = props.searching ? "Searching…" : "Search";
+  const searchLabelLong = props.searching ? "Searching the web…" : "Search public contacts";
   return (
-    <section id={props.id} className="rounded-2xl border border-white bg-white/85 p-3 shadow-soft">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <FilterSelect label="State" value={props.stateId} onChange={props.onStateChange} disabled={false}>
-          <option value="">Select state</option>
-          {props.data.states.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </FilterSelect>
-        <FilterSelect label="County" value={props.countyId} onChange={props.onCountyChange} disabled={countyDisabled}>
-          <option value="">{props.countiesLoading ? "Loading counties…" : "Select county"}</option>
-          {props.counties.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </FilterSelect>
-        <FilterSelect label="Town" value={props.municipalityId} onChange={props.onMunicipalityChange} disabled={townDisabled}>
-          <option value="">{props.placesLoading ? "Loading towns…" : "Select town"}</option>
-          {props.municipalities.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </FilterSelect>
-        <FilterSelect label="Department" value={props.departmentId} onChange={props.onDepartmentChange} disabled={deptDisabled}>
-          <option value="">Select department</option>
-          <option value={DEPARTMENT_NOT_SURE}>Not sure</option>
-          {props.data.departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </FilterSelect>
+    <section
+      id={props.id}
+      className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/90 p-4 shadow-md ring-1 ring-slate-950/[0.04] sm:p-5"
+    >
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-4">
+        <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-3">
+          <FilterSelect label="State" value={props.stateId} onChange={props.onStateChange} disabled={false}>
+            <option value="">Select state</option>
+            {props.data.states.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </FilterSelect>
+          <FilterSelect label="County" value={props.countyId} onChange={props.onCountyChange} disabled={countyDisabled}>
+            <option value="">{props.countiesLoading ? "Loading counties…" : "Select county"}</option>
+            {props.counties.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </FilterSelect>
+          <FilterSelect label="Town" value={props.municipalityId} onChange={props.onMunicipalityChange} disabled={townDisabled}>
+            <option value="">{props.placesLoading ? "Loading towns…" : "Select town"}</option>
+            {props.municipalities.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </FilterSelect>
+          <FilterSelect label="Department" value={props.departmentId} onChange={props.onDepartmentChange} disabled={deptDisabled}>
+            <option value="">Select department</option>
+            <option value={DEPARTMENT_NOT_SURE}>Not sure</option>
+            {props.data.departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </FilterSelect>
+        </div>
+        <button
+          type="button"
+          onClick={props.onSparkle}
+          disabled={props.searching || searchDisabled}
+          aria-label={searchLabelLong}
+          title={searchLabelLong}
+          className="inline-flex h-[3.25rem] w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:h-14 lg:h-auto lg:min-h-[3.5rem] lg:w-[9.25rem] lg:self-end lg:px-4 xl:w-[10rem]"
+        >
+          {props.searching ? <RefreshCw size={18} className="animate-spin shrink-0" aria-hidden /> : <Sparkles size={18} className="shrink-0" aria-hidden />}
+          <span className="text-sm font-bold tracking-tight lg:hidden">{searchLabelLong}</span>
+          <span className="hidden text-sm font-bold tracking-tight lg:inline">{searchLabelShort}</span>
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={props.onSparkle}
-        disabled={props.searching || searchDisabled}
-        className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-950 text-white transition hover:bg-slate-800 disabled:opacity-60"
-      >
-        {props.searching ? <RefreshCw size={17} className="animate-spin" /> : <Sparkles size={17} />}
-        <span className="text-sm font-bold">{props.searching ? "Searching the web…" : "Search public contacts"}</span>
-      </button>
     </section>
   );
 }
 
 function FilterSelect({ label, value, onChange, disabled, children }: { label: string; value: string; onChange: (v: string) => void; disabled?: boolean; children: React.ReactNode }) {
   return (
-    <label className={`relative flex h-12 items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 ${disabled ? "opacity-60" : ""}`}>
-      <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</span>
-      <select
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-        className="focus-ring min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 pr-6 text-sm font-semibold text-slate-800 disabled:cursor-not-allowed"
-      >
-        {children}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-3 text-slate-500" size={16} />
+    <label
+      className={`relative flex min-h-[3.25rem] flex-col justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm transition sm:min-h-[3.5rem] sm:px-4 sm:py-3 ${
+        disabled ? "cursor-not-allowed opacity-60" : "hover:border-slate-300 hover:shadow"
+      }`}
+    >
+      <span className="pl-0.5 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">{label}</span>
+      <div className="relative flex min-h-[2.25rem] items-center">
+        <select
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+          className="focus-ring min-h-[2.25rem] w-full appearance-none rounded-lg border border-slate-100 bg-slate-50/90 py-1.5 pl-2.5 pr-9 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed sm:min-h-[2.375rem] sm:pl-3 sm:text-[15px]"
+        >
+          {children}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500" size={16} aria-hidden />
+      </div>
     </label>
   );
 }
