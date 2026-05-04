@@ -12,8 +12,8 @@
 
 body {
   margin: 0;
-  background: #faf9fe;
-  color: #1a1b1f;
+  background: #f7f9fb;
+  color: #191c1e;
   overflow-x: hidden;
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
@@ -26,10 +26,11 @@ input {
   font: inherit;
 }
 
+/* CivicPulse: glass overlays — light fill, soft blur, crisp edge */
 .glass {
-  background: rgb(255 255 255 / 0.72);
-  border: 1px solid rgb(255 255 255 / 0.5);
-  backdrop-filter: blur(20px) saturate(180%);
+  background: rgb(255 255 255 / 0.7);
+  border: 1px solid rgb(226 232 240 / 0.6);
+  backdrop-filter: blur(12px) saturate(180%);
 }
 
 .focus-ring {
@@ -37,5 +38,5 @@ input {
 }
 
 .focus-ring:focus-visible {
-  box-shadow: 0 0 0 3px rgb(0 88 188 / 0.18);
+  box-shadow: 0 0 0 3px rgb(2 102 255 / 0.22);
 }

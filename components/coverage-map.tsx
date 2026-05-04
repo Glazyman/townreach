@@ -69,7 +69,7 @@ export function CoverageMap({ stateId, countyId, municipalityId, className = "" 
           style(feature) {
             const layer = (feature?.properties as { layer?: string } | null)?.layer;
             if (layer === "county") {
-              return { color: "#2563eb", weight: 2, fillColor: "#93c5fd", fillOpacity: 0.12 };
+              return { color: "#0266ff", weight: 2, fillColor: "#93c5fd", fillOpacity: 0.14 };
             }
             return { color: "#c2410c", weight: 2, fillColor: "#fb923c", fillOpacity: 0.28 };
           }

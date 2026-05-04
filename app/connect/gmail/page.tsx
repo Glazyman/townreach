@@ -16,9 +16,9 @@ export default async function ConnectGmailPage({
   const errorText = error ? errorMessages[error] ?? `Something went wrong (${error}).` : null;
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center px-4 py-10">
-      <section className="w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-soft sm:p-8">
-        <h1 className="font-display text-2xl font-bold text-slate-900">Connect Gmail</h1>
+    <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center bg-surface px-4 py-10">
+      <section className="w-full rounded-xl border border-slate-200/60 bg-white p-6 shadow-soft sm:p-8">
+        <h1 className="font-display text-2xl font-bold text-brand">Connect Gmail</h1>
         {errorText ? (
           <div
             role="alert"

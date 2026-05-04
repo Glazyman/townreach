@@ -591,7 +591,7 @@ export function Dashboard({ data }: DashboardProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_#eef4ff_0,_transparent_28rem),#faf9fe] text-slate-950">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_#e3dfff_0,_transparent_26rem),#f7f9fb] text-on-surface">
       <MobileNavSheet
         open={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
@@ -613,7 +613,7 @@ export function Dashboard({ data }: DashboardProps) {
           {isPastSearchesPath ? (
             <>
               <div className="mb-6">
-                <h1 className="font-display text-xl font-bold text-slate-950 sm:text-2xl">Past searches</h1>
+                <h1 className="font-display text-xl font-bold text-brand sm:text-2xl">Past searches</h1>
                 <p className="mt-1 max-w-2xl text-sm text-slate-500">
                   Public contact lookups saved on this device. Delete individual runs or clear all history. Use{" "}
                   <span className="font-semibold text-slate-700">Email</span> on a result to open the composer.
@@ -632,7 +632,7 @@ export function Dashboard({ data }: DashboardProps) {
           ) : (
             <>
               <div className="mb-4">
-                <h1 className="font-display text-xl font-bold text-slate-950 sm:text-2xl">Municipal Outreach</h1>
+                <h1 className="font-display text-xl font-bold text-brand sm:text-2xl">Municipal Outreach</h1>
                 <p className="mt-0.5 text-sm text-slate-500">
                   Geography from the U.S. Census Bureau (all county-equivalents per state; towns are incorporated places and CDPs intersecting the county). Contacts come from live public web search—no sample directory.
                 </p>
@@ -663,7 +663,7 @@ export function Dashboard({ data }: DashboardProps) {
                 <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">{geographyError}</p>
               )}
               {sparkleMessage && (
-                <p className="mt-2 rounded-xl bg-blue-50 px-4 py-2 text-sm font-medium text-primary">{sparkleMessage}</p>
+                <p className="mt-2 rounded-xl border border-slate-200/60 bg-primary-fixed/80 px-4 py-2 text-sm font-medium text-brand">{sparkleMessage}</p>
               )}
               {(searchLoading || filteredSearchResults.length > 0 || searchError) && (
                 <WebSearchResults
@@ -749,8 +749,8 @@ export function Dashboard({ data }: DashboardProps) {
             )}
 
             {activePanel === "settings" && (
-              <section className="col-span-12 rounded-2xl border border-white bg-white p-6 shadow-soft sm:p-8">
-                <h3 className="font-display text-2xl font-semibold">Admin Settings</h3>
+              <section className="col-span-12 rounded-2xl border border-slate-200/60 bg-white p-6 shadow-soft sm:p-8">
+                <h3 className="font-display text-2xl font-semibold text-brand">Admin Settings</h3>
                 <p className="mt-3 text-sm text-slate-500">Connect inbox providers and set sender identity for outreach.</p>
                 <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
                   <button
@@ -915,7 +915,7 @@ function EmailTemplatesPanel({
 
   return (
     <div className="mt-10 border-t border-slate-100 pt-8">
-      <h4 className="font-display text-lg font-semibold text-slate-900">Email templates</h4>
+      <h4 className="font-display text-lg font-semibold text-brand">Email templates</h4>
       <p className="mt-2 text-sm leading-6 text-slate-500">
         Create and edit templates used in the email composer. Placeholders:{" "}
         <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-800">{"{{contactName}}"}</code>{" "}
@@ -1015,8 +1015,8 @@ function NavLinkList({
               key={item.label}
               href={item.href}
               onClick={() => onLinkClick?.()}
-              className={`flex min-h-[44px] w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-semibold transition active:bg-slate-100 ${
-                active ? "bg-blue-500/10 text-blue-700" : "text-slate-600 hover:bg-white/60 hover:text-slate-950"
+              className={`flex min-h-[44px] w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition active:bg-slate-100 ${
+                active ? "border border-slate-100 bg-white text-brand shadow-sm" : "text-slate-500 hover:bg-indigo-50/60 hover:text-brand"
               }`}
             >
               <item.icon size={20} className="shrink-0" />
@@ -1030,8 +1030,8 @@ function NavLinkList({
             key={item.label}
             type="button"
             onClick={() => onSelectPanel(item.panel)}
-            className={`flex min-h-[44px] w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-semibold transition active:bg-slate-100 ${
-              active ? "bg-blue-500/10 text-blue-700" : "text-slate-600 hover:bg-white/60 hover:text-slate-950"
+            className={`flex min-h-[44px] w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition active:bg-slate-100 ${
+              active ? "border border-slate-100 bg-white text-brand shadow-sm" : "text-slate-500 hover:bg-indigo-50/60 hover:text-brand"
             }`}
           >
             <item.icon size={20} className="shrink-0" />
@@ -1078,17 +1078,17 @@ function MobileNavSheet({
         onClick={onClose}
       />
       <nav
-        className="absolute left-0 top-0 flex h-full w-[min(20rem,calc(100vw-env(safe-area-inset-left)-env(safe-area-inset-right)))] max-w-full flex-col border-r border-slate-100 bg-white p-5 shadow-2xl"
+        className="absolute left-0 top-0 flex h-full w-[min(20rem,calc(100vw-env(safe-area-inset-left)-env(safe-area-inset-right)))] max-w-full flex-col border-r border-slate-200/80 bg-surface-container-low p-5 shadow-2xl"
         style={{ paddingTop: "max(1rem, env(safe-area-inset-top))", paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
         aria-label="Main navigation"
       >
         <div className="mb-6 flex shrink-0 items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand text-white">
               <Building2 size={21} />
             </div>
             <div className="min-w-0">
-              <h2 className="font-display text-lg font-extrabold">TownReach</h2>
+              <h2 className="font-display text-lg font-extrabold text-brand">TownReach</h2>
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Outreach OS</p>
             </div>
           </div>
@@ -1130,14 +1130,14 @@ function SideNav({
   onNavPanel: (panel: ActivePanel) => void;
 }) {
   return (
-    <nav className="glass fixed left-0 top-0 z-40 hidden h-full w-64 flex-col p-6 shadow-glass md:flex">
+    <nav className="fixed left-0 top-0 z-40 hidden h-full w-64 flex-col border-r border-slate-200/80 bg-surface-container-low p-6 md:flex">
       <div className="mb-12 px-2">
-        <Link href="/" className="flex items-center gap-3 rounded-lg outline-none ring-primary/30 transition hover:bg-white/40 focus-visible:ring-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white">
+        <Link href="/" className="flex items-center gap-3 rounded-xl outline-none ring-primary/25 transition hover:bg-white/70 focus-visible:ring-2">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-white">
             <Building2 size={21} />
           </div>
           <div>
-            <h2 className="font-display text-lg font-extrabold">TownReach</h2>
+            <h2 className="font-display text-lg font-extrabold text-brand">TownReach</h2>
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Outreach OS</p>
           </div>
         </Link>
@@ -1161,7 +1161,7 @@ function TopBar({
   companyName: string;
 }) {
   return (
-    <header className="glass fixed right-0 top-0 z-30 w-full pt-[env(safe-area-inset-top)] shadow-sm md:w-[calc(100%-16rem)]">
+    <header className="fixed right-0 top-0 z-30 w-full border-b border-slate-200/60 bg-white/70 pt-[env(safe-area-inset-top)] shadow-soft backdrop-blur-xl md:w-[calc(100%-16rem)]">
       <div className="flex h-14 items-center justify-between gap-2 px-3 sm:gap-3 sm:px-4 md:px-6">
         <button type="button" onClick={onMenuClick} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-white/80 md:hidden" aria-label="Open navigation menu">
           <Menu size={22} />
@@ -1171,7 +1171,7 @@ function TopBar({
           <input
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="focus-ring h-11 w-full min-w-0 rounded-full border-0 bg-slate-100 py-2 pl-10 pr-3 text-sm text-slate-700 sm:pl-11 sm:pr-4"
+            className="focus-ring h-11 w-full min-w-0 rounded-full border-0 bg-surface-container-low py-2 pl-10 pr-3 text-sm text-slate-700 sm:pl-11 sm:pr-4"
             placeholder="Filter search results…"
             enterKeyHint="search"
             autoComplete="off"
@@ -1223,7 +1223,7 @@ function FilterBar(props: {
   return (
     <section
       id={props.id}
-      className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/90 p-4 shadow-md ring-1 ring-slate-950/[0.04] sm:p-5"
+      className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-soft sm:p-5"
     >
       <div className="flex flex-col gap-3">
         <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-3">
@@ -1266,7 +1266,7 @@ function FilterBar(props: {
             type="button"
             onClick={props.onSparkle}
             disabled={props.searching || searchDisabled}
-            className="flex h-11 w-full max-w-xl items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-center text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:h-12 sm:max-w-2xl sm:px-6"
+            className="flex h-11 w-full max-w-xl items-center justify-center gap-2 rounded-xl bg-primary px-4 text-center text-white shadow-lg shadow-primary/20 transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-60 sm:h-12 sm:max-w-2xl sm:px-6"
           >
             {props.searching ? <RefreshCw size={17} className="animate-spin shrink-0" aria-hidden /> : <Sparkles size={17} className="shrink-0" aria-hidden />}
             <span className="text-center text-sm font-bold">{searchLabel}</span>
@@ -1345,10 +1345,10 @@ function WebSearchResultsList({
   const rest = results.filter((r) => !r.email && !r.phone && !r.name);
 
   return (
-    <div className={`${className} overflow-hidden rounded-2xl border border-white bg-white shadow-soft`}>
+    <div className={`${className} overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-soft`}>
       <div className="flex flex-col gap-2 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
         <div className="min-w-0">
-          <h3 className="font-display text-lg font-semibold">Contacts Found</h3>
+          <h3 className="font-display text-lg font-semibold text-brand">Contacts Found</h3>
           <p className="mt-0.5 text-sm text-slate-500">
             {department?.name} · {municipality?.name}
           </p>
@@ -1482,8 +1482,8 @@ function PastSearchesPanel({
 
   const sectionClass =
     variant === "page"
-      ? "col-span-12 flex max-h-[min(calc(100dvh-13rem),52rem)] flex-col rounded-2xl border border-white bg-white p-4 shadow-soft sm:p-6"
-      : "col-span-12 flex max-h-[min(32rem,70vh)] flex-col rounded-2xl border border-white bg-white p-4 shadow-soft sm:p-6 lg:col-span-4";
+      ? "col-span-12 flex max-h-[min(calc(100dvh-13rem),52rem)] flex-col rounded-2xl border border-slate-200/60 bg-white p-4 shadow-soft sm:p-6"
+      : "col-span-12 flex max-h-[min(32rem,70vh)] flex-col rounded-2xl border border-slate-200/60 bg-white p-4 shadow-soft sm:p-6 lg:col-span-4";
 
   const emptyHint =
     variant === "page"
@@ -1498,7 +1498,7 @@ function PastSearchesPanel({
             <History size={22} />
           </div>
           <div className="min-w-0">
-            <h3 className="font-display text-lg font-semibold sm:text-xl">Past searches</h3>
+            <h3 className="font-display text-lg font-semibold text-brand sm:text-xl">Past searches</h3>
             <p className="text-xs text-slate-500">Each public contact search is saved on this device.</p>
           </div>
         </div>
@@ -1649,11 +1649,11 @@ function IntentAssistant({
   const countyDisabled = !stateId || countiesLoading;
   const townDisabled = !countyId || placesLoading;
   return (
-    <section id={id} className="col-span-12 rounded-2xl border border-white bg-white p-4 shadow-soft sm:p-6 lg:col-span-7">
+    <section id={id} className="col-span-12 rounded-2xl border border-slate-200/60 bg-white p-4 shadow-soft sm:p-6 lg:col-span-7">
       <div className="mb-5 flex items-start gap-3 sm:gap-4">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-primary"><Lightbulb size={22} /></div>
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-fixed/90 text-primary"><Lightbulb size={22} /></div>
         <div className="min-w-0">
-          <h3 className="font-display text-xl font-semibold">Not sure which department?</h3>
+          <h3 className="font-display text-xl font-semibold text-brand">Not sure which department?</h3>
           <p className="mt-1 text-sm leading-6 text-slate-500">
             Describe what you need in one line. We suggest a municipal function; you can narrow state, county, and town here too (they stay in sync with the filters above). Then run <span className="font-semibold text-slate-700">Search public contacts</span> for real emails.
           </p>
@@ -1699,7 +1699,7 @@ function IntentAssistant({
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Suggested department</p>
-              <h4 className="mt-1 text-lg font-bold text-slate-950">{department.name}</h4>
+              <h4 className="mt-1 text-lg font-bold text-brand">{department.name}</h4>
               <p className="mt-1 text-sm leading-6 text-slate-500">{department.description}</p>
               <p className="mt-3 text-sm text-slate-500">
                 {municipality ? (
@@ -1766,12 +1766,12 @@ function InboxPanel({
   }
 
   return (
-    <section className="col-span-12 rounded-2xl border border-white bg-surface-container-low p-4 shadow-soft sm:p-6 md:col-span-4">
+    <section className="col-span-12 rounded-2xl border border-slate-200/60 bg-surface-container-low p-4 shadow-soft sm:p-6 md:col-span-4">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="flex min-w-0 items-center gap-3 sm:gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100 text-secondary"><Inbox size={22} /></div>
           <div>
-            <h3 className="font-display text-xl font-semibold">Response Tracking</h3>
+            <h3 className="font-display text-xl font-semibold text-brand">Response Tracking</h3>
             <p className="text-xs text-slate-500">Gmail &amp; Outlook threads</p>
           </div>
         </div>
@@ -1854,10 +1854,10 @@ function EmailTrackerPanel({
   }
 
   return (
-    <section className="col-span-12 rounded-2xl border border-white bg-white p-4 shadow-soft sm:p-6">
+    <section className="col-span-12 rounded-2xl border border-slate-200/60 bg-white p-4 shadow-soft sm:p-6">
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-display text-2xl font-semibold">Email Tracker</h3>
+          <h3 className="font-display text-2xl font-semibold text-brand">Email Tracker</h3>
           <p className="mt-1 text-sm text-slate-500">Track sent outreach and municipal replies in one place.</p>
         </div>
       </div>
@@ -1959,10 +1959,10 @@ function MapPanel({
     : "Select state, county, and town to see boundaries.";
 
   return (
-    <section className="col-span-12 rounded-2xl border border-white bg-white p-4 shadow-soft sm:p-6 md:col-span-8">
+    <section className="col-span-12 rounded-2xl border border-slate-200/60 bg-white p-4 shadow-soft sm:p-6 md:col-span-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-display text-xl font-semibold">Coverage map</h3>
+          <h3 className="font-display text-xl font-semibold text-brand">Coverage map</h3>
           <p className="mt-2 text-sm leading-6 text-slate-500">{contextLine}</p>
           <p className="mt-2 text-xs leading-5 text-slate-400">
             Blue outline: selected county (Census 2020). Orange fill: selected incorporated place or CDP when a town is chosen. Basemap: OpenStreetMap.
@@ -2113,7 +2113,7 @@ function ComposerDrawer({
           <div className="flex items-start justify-between gap-3 border-b border-slate-100 p-4 sm:p-6">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Email Composer</p>
-              <h2 className="mt-2 font-display text-2xl font-bold">Send municipal outreach</h2>
+              <h2 className="mt-2 font-display text-2xl font-bold text-brand">Send municipal outreach</h2>
             </div>
             <button type="button" onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100" aria-label="Close composer"><X size={20} /></button>
           </div>
@@ -2145,7 +2145,7 @@ function ComposerDrawer({
                     type="button"
                     onClick={() => setProvider(p)}
                     className={`flex min-h-[44px] items-center justify-center rounded-xl border text-sm font-bold capitalize transition ${
-                      provider === p ? "border-primary bg-blue-50 text-primary" : "border-slate-200 bg-white text-slate-600"
+                      provider === p ? "border-primary bg-primary-fixed/70 text-primary" : "border-slate-200 bg-white text-slate-600"
                     } ${((p === "gmail" && !emailSettings.gmailConnected) || (p === "outlook" && !emailSettings.outlookConnected)) ? "opacity-60" : ""}`}
                   >
                     {p} {((p === "gmail" && emailSettings.gmailConnected) || (p === "outlook" && emailSettings.outlookConnected)) ? "✓" : "(connect)"}
@@ -2290,7 +2290,7 @@ function WebSearchResults({ loading, results, error, municipality, department, o
 }) {
   if (loading) {
     return (
-      <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-6">
+      <div className="mt-4 rounded-xl border border-slate-200/60 bg-primary-fixed/50 p-6">
         <div className="flex items-center gap-3">
           <RefreshCw size={20} className="animate-spin text-primary" />
           <div>
