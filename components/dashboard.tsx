@@ -553,7 +553,7 @@ export function Dashboard({ data }: DashboardProps) {
                   error={searchError}
                   municipality={selectedMunicipality}
                   department={effectiveDepartment}
-                  onEmail={(candidate) => {
+                  onEmail={(candidate, selectedEmail) => {
                     const dept = effectiveDepartment;
                     if (!dept || !selectedMunicipality) return;
                     const contact: ContactRecord = {
@@ -562,7 +562,7 @@ export function Dashboard({ data }: DashboardProps) {
                       departmentId: dept.id,
                       name: candidate.name || candidate.pageTitle,
                       title: candidate.title,
-                      email: candidate.email,
+                      email: selectedEmail,
                       phone: candidate.phone,
                       sourceUrl: candidate.sourceUrl,
                       confidence: candidate.confidence,
@@ -605,7 +605,7 @@ export function Dashboard({ data }: DashboardProps) {
               <>
                 <PastSearchesPanel
                   searches={pastSearches}
-                  onEmailFromHistory={(candidate, entry) => {
+                  onEmailFromHistory={(candidate, entry, selectedEmail) => {
                     setStateId(entry.stateId);
                     setCountyId(entry.countyId);
                     setMunicipalityId(entry.municipalityId);
@@ -618,7 +618,7 @@ export function Dashboard({ data }: DashboardProps) {
                       departmentId: entry.departmentId,
                       name: candidate.name || candidate.pageTitle,
                       title: candidate.title,
-                      email: candidate.email,
+                      email: selectedEmail,
                       phone: candidate.phone,
                       sourceUrl: candidate.sourceUrl,
                       confidence: candidate.confidence,
@@ -1154,6 +1154,27 @@ function FilterSelect({ label, value, onChange, disabled, children }: { label: s
   );
 }
 
+function uniqueEmailsFromCandidate(result: WebSearchCandidate): string[] {
+  const raw =
+    result.allEmails && result.allEmails.length > 0 ? result.allEmails : result.email ? [result.email] : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const e of raw) {
+    const t = e.trim();
+    if (!t) continue;
+    const k = t.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(t);
+  }
+  return out;
+}
+
+function defaultPickEmail(result: WebSearchCandidate, emails: string[]) {
+  if (result.email && emails.includes(result.email)) return result.email;
+  return emails[0] ?? "";
+}
+
 function WebSearchResultsList({
   results,
   municipality,
@@ -1164,9 +1185,15 @@ function WebSearchResultsList({
   results: WebSearchCandidate[];
   municipality?: MunicipalityRecord;
   department?: DepartmentRecord;
-  onEmail: (candidate: WebSearchCandidate) => void;
+  onEmail: (candidate: WebSearchCandidate, selectedEmail: string) => void;
   className?: string;
 }) {
+  const [pickedEmailByRow, setPickedEmailByRow] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    setPickedEmailByRow({});
+  }, [results]);
+
   if (results.length === 0) return null;
   const useful = results.filter((r) => r.email || r.phone || r.name);
   const rest = results.filter((r) => !r.email && !r.phone && !r.name);
@@ -1186,55 +1213,83 @@ function WebSearchResultsList({
       </div>
 
       <div className="divide-y divide-slate-100">
-        {useful.map((result, i) => (
-          <div key={i} className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
-            <div className="min-w-0 flex-1">
-              {result.name && (
-                <p className="font-semibold text-slate-900">{result.name}</p>
-              )}
-              {result.title && (
-                <p className="mt-0.5 text-xs text-slate-500">{result.title}</p>
-              )}
-              <div className="mt-2 flex flex-col gap-1">
-                {(result.allEmails ?? (result.email ? [result.email] : [])).map((email) => (
-                  <div key={email} className="flex items-center gap-2">
-                    <Mail size={13} className="shrink-0 text-primary" />
-                    <span className="text-sm font-medium text-primary">{email}</span>
-                  </div>
-                ))}
-                {(result.allPhones ?? (result.phone ? [result.phone] : [])).map((phone) => (
-                  <div key={phone} className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400">📞</span>
-                    <span className="text-sm text-slate-700">{phone}</span>
-                  </div>
-                ))}
-              </div>
-              <a
-                href={result.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 inline-block max-w-full truncate text-xs text-slate-400 hover:text-primary hover:underline sm:max-w-xs"
-              >
-                {result.sourceUrl.replace(/^https?:\/\//, "").split("/")[0]}
-              </a>
-            </div>
-            <div className="flex shrink-0 flex-row items-center justify-between gap-2 sm:flex-col sm:items-end">
-              <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">
-                {result.confidence}% match
-              </span>
-              {result.email && (
-                <button
-                  type="button"
-                  onClick={() => onEmail(result)}
-                  className="flex min-h-[44px] min-w-[7rem] items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white transition hover:bg-primary-container sm:min-h-0 sm:min-w-0 sm:px-3"
+        {useful.map((result, i) => {
+          const emails = uniqueEmailsFromCandidate(result);
+          const picked = pickedEmailByRow[i] ?? defaultPickEmail(result, emails);
+          const multi = emails.length > 1;
+          const hasEmail = emails.length > 0;
+
+          return (
+            <div key={i} className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-6">
+              <div className="min-w-0 flex-1">
+                {result.name && <p className="font-semibold text-slate-900">{result.name}</p>}
+                {result.title && <p className="mt-0.5 text-xs text-slate-500">{result.title}</p>}
+                {multi && (
+                  <p className="mt-2 text-xs font-medium text-slate-600">
+                    Multiple addresses — select one, click an address to compose, or use{" "}
+                    <span className="font-bold text-slate-800">Email</span> for the selected row.
+                  </p>
+                )}
+                <div className="mt-2 flex flex-col gap-1.5">
+                  {emails.map((email) => (
+                    <div key={email} className="flex items-start gap-2">
+                      {multi ? (
+                        <input
+                          type="radio"
+                          name={`contact-email-choice-${i}`}
+                          checked={picked === email}
+                          onChange={() => setPickedEmailByRow((prev) => ({ ...prev, [i]: email }))}
+                          className="focus-ring mt-2 h-4 w-4 shrink-0 cursor-pointer accent-primary"
+                          aria-label={`Select ${email}`}
+                        />
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPickedEmailByRow((prev) => ({ ...prev, [i]: email }));
+                          onEmail(result, email);
+                        }}
+                        className="focus-ring group flex min-h-[40px] flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-medium text-primary transition hover:bg-primary/5 hover:underline sm:min-h-0"
+                      >
+                        <Mail size={14} className="shrink-0 text-primary group-hover:text-primary-container" aria-hidden />
+                        <span className="min-w-0 break-all">{email}</span>
+                      </button>
+                    </div>
+                  ))}
+                  {(result.allPhones ?? (result.phone ? [result.phone] : [])).map((phone) => (
+                    <div key={phone} className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400">📞</span>
+                      <span className="text-sm text-slate-700">{phone}</span>
+                    </div>
+                  ))}
+                </div>
+                <a
+                  href={result.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-block max-w-full truncate text-xs text-slate-400 hover:text-primary hover:underline sm:max-w-xs"
                 >
-                  <Mail size={13} />
-                  Email
-                </button>
-              )}
+                  {result.sourceUrl.replace(/^https?:\/\//, "").split("/")[0]}
+                </a>
+              </div>
+              <div className="flex shrink-0 flex-row items-center justify-between gap-2 sm:flex-col sm:items-end">
+                <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">
+                  {result.confidence}% match
+                </span>
+                {hasEmail && picked ? (
+                  <button
+                    type="button"
+                    onClick={() => onEmail(result, picked)}
+                    className="flex min-h-[44px] min-w-[7rem] items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white transition hover:bg-primary-container sm:min-h-0 sm:min-w-0 sm:px-3"
+                  >
+                    <Mail size={13} aria-hidden />
+                    Email
+                  </button>
+                ) : null}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {rest.length > 0 && (
           <div className="px-4 py-4 sm:px-6">
@@ -1265,7 +1320,7 @@ function PastSearchesPanel({
   onEmailFromHistory
 }: {
   searches: PastSearchEntry[];
-  onEmailFromHistory?: (candidate: WebSearchCandidate, entry: PastSearchEntry) => void;
+  onEmailFromHistory?: (candidate: WebSearchCandidate, entry: PastSearchEntry, selectedEmail: string) => void;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   return (
@@ -1344,7 +1399,7 @@ function PastSearchesPanel({
                           slug: s.departmentId,
                           description: ""
                         }}
-                        onEmail={(c) => onEmailFromHistory?.(c, s)}
+                        onEmail={(c, sel) => onEmailFromHistory?.(c, s, sel)}
                       />
                     )}
                   </div>
@@ -2023,7 +2078,7 @@ function WebSearchResults({ loading, results, error, municipality, department, o
   error: string;
   municipality?: MunicipalityRecord;
   department?: DepartmentRecord;
-  onEmail: (candidate: WebSearchCandidate) => void;
+  onEmail: (candidate: WebSearchCandidate, selectedEmail: string) => void;
 }) {
   if (loading) {
     return (
