@@ -1,10 +1,32 @@
 import Link from "next/link";
 
-export default function ConnectGmailPage() {
+const errorMessages: Record<string, string> = {
+  state: "The sign-in session expired or was invalid. Try connecting again.",
+  missing_env: "Gmail OAuth is not configured on the server (missing client ID or secret).",
+  token_exchange:
+    "Google sign-in worked, but saving the connection failed. On Vercel this is usually fixed by the latest deploy. If it persists, check Vercel logs for [gmail/callback]."
+};
+
+export default async function ConnectGmailPage({
+  searchParams
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+  const errorText = error ? errorMessages[error] ?? `Something went wrong (${error}).` : null;
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center px-4 py-10">
       <section className="w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-soft sm:p-8">
         <h1 className="font-display text-2xl font-bold text-slate-900">Connect Gmail</h1>
+        {errorText ? (
+          <div
+            role="alert"
+            className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+          >
+            {errorText}
+          </div>
+        ) : null}
         <p className="mt-3 text-sm leading-6 text-slate-600">
           Connect your Google account so TownReach can send outreach and sync replies from Gmail.
         </p>
@@ -32,3 +54,4 @@ export default function ConnectGmailPage() {
     </main>
   );
 }
+

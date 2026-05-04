@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { exchangeCodeForGmailTokens, getGmailOAuthConfig } from "@/lib/gmail-oauth";
+import {
+  exchangeCodeForGmailTokens,
+  getGmailOAuthConfig,
+  saveStoredGmailTokens
+} from "@/lib/gmail-oauth";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -20,15 +24,17 @@ export async function GET(request: Request) {
   }
 
   try {
-    await exchangeCodeForGmailTokens({
+    const stored = await exchangeCodeForGmailTokens({
       code,
       clientId: cfg.clientId,
       clientSecret: cfg.clientSecret,
       redirectUri: cfg.redirectUri
     });
-  } catch {
+    const res = NextResponse.redirect(`${origin}/?gmail_connected=1`);
+    await saveStoredGmailTokens(stored, res);
+    return res;
+  } catch (err) {
+    console.error("[gmail/callback] token_exchange", err);
     return NextResponse.redirect(`${origin}/connect/gmail?error=token_exchange`);
   }
-
-  return NextResponse.redirect(`${origin}/?gmail_connected=1`);
 }

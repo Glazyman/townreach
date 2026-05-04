@@ -1,5 +1,8 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 
 type StoredGmailTokens = {
   refreshToken: string;
@@ -13,6 +16,61 @@ type StoredGmailTokens = {
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const TOKEN_FILE = path.join(DATA_DIR, "gmail-oauth.json");
+const GMAIL_OAUTH_COOKIE = "tr_gmail_oauth";
+
+function isVercelServerless() {
+  return process.env.VERCEL === "1";
+}
+
+function gmailCookieSigningSecret() {
+  return process.env.TOWNREACH_OAUTH_SECRET || process.env.GOOGLE_CLIENT_SECRET;
+}
+
+function encodeSignedGmailPayload(store: StoredGmailTokens) {
+  const secret = gmailCookieSigningSecret();
+  if (!secret) {
+    throw new Error(
+      "Set TOWNREACH_OAUTH_SECRET (recommended) or rely on GOOGLE_CLIENT_SECRET to sign the Gmail session cookie on Vercel."
+    );
+  }
+  const payload = Buffer.from(JSON.stringify(store), "utf8").toString("base64url");
+  const sig = createHmac("sha256", secret).update(payload).digest("base64url");
+  const value = `${payload}.${sig}`;
+  if (value.length > 3800) {
+    throw new Error("Gmail OAuth data is too large for cookie storage.");
+  }
+  return value;
+}
+
+function decodeSignedGmailPayload(raw: string): StoredGmailTokens | null {
+  const secret = gmailCookieSigningSecret();
+  if (!secret) return null;
+  const dot = raw.lastIndexOf(".");
+  if (dot <= 0) return null;
+  const payload = raw.slice(0, dot);
+  const sig = raw.slice(dot + 1);
+  const expected = createHmac("sha256", secret).update(payload).digest("base64url");
+  try {
+    const a = Buffer.from(sig, "utf8");
+    const b = Buffer.from(expected, "utf8");
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  } catch {
+    return null;
+  }
+  try {
+    return JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as StoredGmailTokens;
+  } catch {
+    return null;
+  }
+}
+
+const gmailCookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: 60 * 60 * 24 * 400
+};
 
 function oauthBase() {
   return "https://oauth2.googleapis.com/token";
@@ -30,6 +88,12 @@ async function ensureDataDir() {
 }
 
 export async function getStoredGmailTokens(): Promise<StoredGmailTokens | null> {
+  if (isVercelServerless()) {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(GMAIL_OAUTH_COOKIE)?.value;
+    if (!raw) return null;
+    return decodeSignedGmailPayload(raw);
+  }
   try {
     const raw = await readFile(TOKEN_FILE, "utf8");
     return JSON.parse(raw) as StoredGmailTokens;
@@ -38,12 +102,27 @@ export async function getStoredGmailTokens(): Promise<StoredGmailTokens | null> 
   }
 }
 
-export async function saveStoredGmailTokens(tokens: StoredGmailTokens) {
+/** On Vercel, pass `response` from the OAuth callback so Set-Cookie is applied to the redirect. */
+export async function saveStoredGmailTokens(tokens: StoredGmailTokens, response?: NextResponse) {
+  if (isVercelServerless()) {
+    const value = encodeSignedGmailPayload(tokens);
+    if (response) {
+      response.cookies.set(GMAIL_OAUTH_COOKIE, value, gmailCookieOptions);
+      return;
+    }
+    const cookieStore = await cookies();
+    cookieStore.set(GMAIL_OAUTH_COOKIE, value, gmailCookieOptions);
+    return;
+  }
   await ensureDataDir();
   await writeFile(TOKEN_FILE, JSON.stringify(tokens, null, 2), "utf8");
 }
 
 export async function clearStoredGmailTokens() {
+  if (isVercelServerless()) {
+    const cookieStore = await cookies();
+    cookieStore.delete(GMAIL_OAUTH_COOKIE);
+  }
   try {
     await rm(TOKEN_FILE, { force: true });
   } catch {
@@ -108,7 +187,6 @@ export async function exchangeCodeForGmailTokens(args: {
   if (!stored.refreshToken) {
     throw new Error("Google did not return a refresh token. Re-consent is required.");
   }
-  await saveStoredGmailTokens(stored);
   return stored;
 }
 
