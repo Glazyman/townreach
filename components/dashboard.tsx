@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Bell,
   Building2,
@@ -46,6 +48,10 @@ import type {
 type DashboardProps = { data: DashboardData };
 type SendState = "idle" | "sending" | "sent" | "error";
 type ActivePanel = "dashboard" | "contacts" | "email-tracker" | "settings";
+
+type AppNavItem =
+  | { kind: "panel"; icon: React.ElementType; label: string; panel: ActivePanel }
+  | { kind: "route"; icon: React.ElementType; label: string; href: string };
 type EmailConnectionSettings = {
   gmailConnected: boolean;
   outlookConnected: boolean;
@@ -448,6 +454,66 @@ export function Dashboard({ data }: DashboardProps) {
     setComposerMunicipality(undefined);
   }, []);
 
+  const pathname = usePathname();
+  const router = useRouter();
+  const isPastSearchesPath = pathname === "/past-searches";
+
+  const removePastSearch = useCallback((id: string) => {
+    setPastSearches((prev) => prev.filter((e) => e.id !== id));
+  }, []);
+
+  const clearAllPastSearches = useCallback(() => {
+    if (!window.confirm("Remove all past searches from this device?")) return;
+    setPastSearches([]);
+  }, []);
+
+  const handleNavPanel = useCallback(
+    (panel: ActivePanel) => {
+      if (pathname === "/past-searches") {
+        router.push("/");
+      }
+      setActivePanel(panel);
+    },
+    [pathname, router]
+  );
+
+  function handleEmailFromHistory(candidate: WebSearchCandidate, entry: PastSearchEntry, selectedEmail: string) {
+    setStateId(entry.stateId);
+    setCountyId(entry.countyId);
+    setMunicipalityId(entry.municipalityId);
+    setDepartmentId(entry.departmentId);
+    setSearchResults(cloneWebCandidates(entry.candidates));
+    setSearchError("");
+    const contact: ContactRecord = {
+      id: newWebContactId(),
+      municipalityId: entry.municipalityId,
+      departmentId: entry.departmentId,
+      name: greetingFirstName({
+        name: candidate.name,
+        pageTitle: candidate.pageTitle,
+        snippet: candidate.snippet,
+        email: selectedEmail
+      }),
+      title: candidate.title,
+      email: selectedEmail,
+      phone: candidate.phone,
+      sourceUrl: candidate.sourceUrl,
+      confidence: candidate.confidence,
+      verified: false,
+      lastChecked: new Date().toISOString().split("T")[0]
+    };
+    const hint: MunicipalityRecord = {
+      id: entry.municipalityId,
+      countyId: entry.countyId,
+      stateId: entry.stateId,
+      name: entry.municipalityName,
+      kind: "city",
+      placeFips: ""
+    };
+    setActivePanel("dashboard");
+    openComposer(contact, hint);
+  }
+
   async function handleSparkle() {
     if (readyForLookup && selectedMunicipality && effectiveDepartment) {
       setSearchLoading(true);
@@ -516,11 +582,12 @@ export function Dashboard({ data }: DashboardProps) {
     setTimeout(() => setSparkleMessage(""), 4500);
   }
 
-  const navItems: { icon: React.ElementType; label: string; panel: ActivePanel }[] = [
-    { icon: Gauge, label: "Dashboard", panel: "dashboard" },
-    { icon: Building2, label: "Contact Finder", panel: "contacts" },
-    { icon: Mail, label: "Email Tracker", panel: "email-tracker" },
-    { icon: Settings, label: "Admin Settings", panel: "settings" }
+  const navItems: AppNavItem[] = [
+    { kind: "panel", icon: Gauge, label: "Dashboard", panel: "dashboard" },
+    { kind: "panel", icon: Building2, label: "Contact Finder", panel: "contacts" },
+    { kind: "route", icon: History, label: "Past searches", href: "/past-searches" },
+    { kind: "panel", icon: Mail, label: "Email Tracker", panel: "email-tracker" },
+    { kind: "panel", icon: Settings, label: "Admin Settings", panel: "settings" }
   ];
 
   return (
@@ -529,10 +596,11 @@ export function Dashboard({ data }: DashboardProps) {
         open={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
         items={navItems}
+        pathname={pathname}
         activePanel={activePanel}
-        onNavChange={setActivePanel}
+        onNavPanel={handleNavPanel}
       />
-      <SideNav items={navItems} activePanel={activePanel} onNavChange={setActivePanel} />
+      <SideNav items={navItems} pathname={pathname} activePanel={activePanel} onNavPanel={handleNavPanel} />
       <TopBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -542,14 +610,35 @@ export function Dashboard({ data }: DashboardProps) {
       />
       <main className="min-h-screen px-3 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-[calc(3.5rem+env(safe-area-inset-top))] sm:px-4 md:ml-64 md:px-6">
         <section className="mx-auto max-w-[1400px]">
-          <div className="mb-4">
-            <h1 className="font-display text-xl font-bold text-slate-950 sm:text-2xl">Municipal Outreach</h1>
-            <p className="mt-0.5 text-sm text-slate-500">
-              Geography from the U.S. Census Bureau (all county-equivalents per state; towns are incorporated places and CDPs intersecting the county). Contacts come from live public web search—no sample directory.
-            </p>
-          </div>
+          {isPastSearchesPath ? (
+            <>
+              <div className="mb-6">
+                <h1 className="font-display text-xl font-bold text-slate-950 sm:text-2xl">Past searches</h1>
+                <p className="mt-1 max-w-2xl text-sm text-slate-500">
+                  Public contact lookups saved on this device. Delete individual runs or clear all history. Use{" "}
+                  <span className="font-semibold text-slate-700">Email</span> on a result to open the composer.
+                </p>
+              </div>
+              <div className="mt-2 grid grid-cols-12 gap-3 sm:gap-4">
+                <PastSearchesPanel
+                  searches={pastSearches}
+                  variant="page"
+                  onDeleteEntry={removePastSearch}
+                  onClearAll={clearAllPastSearches}
+                  onEmailFromHistory={handleEmailFromHistory}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="mb-4">
+                <h1 className="font-display text-xl font-bold text-slate-950 sm:text-2xl">Municipal Outreach</h1>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  Geography from the U.S. Census Bureau (all county-equivalents per state; towns are incorporated places and CDPs intersecting the county). Contacts come from live public web search—no sample directory.
+                </p>
+              </div>
 
-          {(activePanel === "dashboard" || activePanel === "contacts") && (
+              {(activePanel === "dashboard" || activePanel === "contacts") && (
             <>
               <FilterBar
                 id="contact-filters"
@@ -640,42 +729,10 @@ export function Dashboard({ data }: DashboardProps) {
               <>
                 <PastSearchesPanel
                   searches={pastSearches}
-                  onEmailFromHistory={(candidate, entry, selectedEmail) => {
-                    setStateId(entry.stateId);
-                    setCountyId(entry.countyId);
-                    setMunicipalityId(entry.municipalityId);
-                    setDepartmentId(entry.departmentId);
-                    setSearchResults(cloneWebCandidates(entry.candidates));
-                    setSearchError("");
-                    const contact: ContactRecord = {
-                      id: newWebContactId(),
-                      municipalityId: entry.municipalityId,
-                      departmentId: entry.departmentId,
-                      name: greetingFirstName({
-                        name: candidate.name,
-                        pageTitle: candidate.pageTitle,
-                        snippet: candidate.snippet,
-                        email: selectedEmail
-                      }),
-                      title: candidate.title,
-                      email: selectedEmail,
-                      phone: candidate.phone,
-                      sourceUrl: candidate.sourceUrl,
-                      confidence: candidate.confidence,
-                      verified: false,
-                      lastChecked: new Date().toISOString().split("T")[0]
-                    };
-                    const hint: MunicipalityRecord = {
-                      id: entry.municipalityId,
-                      countyId: entry.countyId,
-                      stateId: entry.stateId,
-                      name: entry.municipalityName,
-                      kind: "city",
-                      placeFips: ""
-                    };
-                    setActivePanel("dashboard");
-                    openComposer(contact, hint);
-                  }}
+                  variant="compact"
+                  onDeleteEntry={removePastSearch}
+                  onClearAll={clearAllPastSearches}
+                  onEmailFromHistory={handleEmailFromHistory}
                 />
                 <InboxPanel threads={threads} contacts={data.contacts} onThreadsUpdate={setThreads} />
               </>
@@ -789,6 +846,8 @@ export function Dashboard({ data }: DashboardProps) {
               />
             )}
           </div>
+            </>
+          )}
         </section>
       </main>
 
@@ -803,6 +862,7 @@ export function Dashboard({ data }: DashboardProps) {
         onOpenEmailSettings={() => {
           setDrawerOpen(false);
           setMobileNavOpen(false);
+          if (pathname === "/past-searches") router.push("/");
           setActivePanel("settings");
         }}
         templates={emailTemplatesList}
@@ -931,36 +991,72 @@ function EmailTemplatesPanel({
   );
 }
 
-function NavLinkList({ items, activePanel, onSelect }: {
-  items: { icon: React.ElementType; label: string; panel: ActivePanel }[];
+function NavLinkList({
+  items,
+  pathname,
+  activePanel,
+  onSelectPanel,
+  onLinkClick
+}: {
+  items: AppNavItem[];
+  pathname: string;
   activePanel: ActivePanel;
-  onSelect: (panel: ActivePanel) => void;
+  onSelectPanel: (panel: ActivePanel) => void;
+  onLinkClick?: () => void;
 }) {
+  const onMainApp = pathname !== "/past-searches";
   return (
     <div className="space-y-1">
-      {items.map((item) => (
-        <button
-          key={item.label}
-          type="button"
-          onClick={() => onSelect(item.panel)}
-          className={`flex min-h-[44px] w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-semibold transition active:bg-slate-100 ${
-            item.panel === activePanel ? "bg-blue-500/10 text-blue-700" : "text-slate-600 hover:bg-white/60 hover:text-slate-950"
-          }`}
-        >
-          <item.icon size={20} className="shrink-0" />
-          <span className="leading-snug">{item.label}</span>
-        </button>
-      ))}
+      {items.map((item) => {
+        if (item.kind === "route") {
+          const active = pathname === item.href;
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              onClick={() => onLinkClick?.()}
+              className={`flex min-h-[44px] w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-semibold transition active:bg-slate-100 ${
+                active ? "bg-blue-500/10 text-blue-700" : "text-slate-600 hover:bg-white/60 hover:text-slate-950"
+              }`}
+            >
+              <item.icon size={20} className="shrink-0" />
+              <span className="leading-snug">{item.label}</span>
+            </Link>
+          );
+        }
+        const active = onMainApp && activePanel === item.panel;
+        return (
+          <button
+            key={item.label}
+            type="button"
+            onClick={() => onSelectPanel(item.panel)}
+            className={`flex min-h-[44px] w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-semibold transition active:bg-slate-100 ${
+              active ? "bg-blue-500/10 text-blue-700" : "text-slate-600 hover:bg-white/60 hover:text-slate-950"
+            }`}
+          >
+            <item.icon size={20} className="shrink-0" />
+            <span className="leading-snug">{item.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-function MobileNavSheet({ open, onClose, items, activePanel, onNavChange }: {
+function MobileNavSheet({
+  open,
+  onClose,
+  items,
+  pathname,
+  activePanel,
+  onNavPanel
+}: {
   open: boolean;
   onClose: () => void;
-  items: { icon: React.ElementType; label: string; panel: ActivePanel }[];
+  items: AppNavItem[];
+  pathname: string;
   activePanel: ActivePanel;
-  onNavChange: (panel: ActivePanel) => void;
+  onNavPanel: (panel: ActivePanel) => void;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -1008,11 +1104,13 @@ function MobileNavSheet({ open, onClose, items, activePanel, onNavChange }: {
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <NavLinkList
             items={items}
+            pathname={pathname}
             activePanel={activePanel}
-            onSelect={(panel) => {
-              onNavChange(panel);
+            onSelectPanel={(panel) => {
+              onNavPanel(panel);
               onClose();
             }}
+            onLinkClick={onClose}
           />
         </div>
       </nav>
@@ -1020,15 +1118,21 @@ function MobileNavSheet({ open, onClose, items, activePanel, onNavChange }: {
   );
 }
 
-function SideNav({ items, activePanel, onNavChange }: {
-  items: { icon: React.ElementType; label: string; panel: ActivePanel }[];
+function SideNav({
+  items,
+  pathname,
+  activePanel,
+  onNavPanel
+}: {
+  items: AppNavItem[];
+  pathname: string;
   activePanel: ActivePanel;
-  onNavChange: (panel: ActivePanel) => void;
+  onNavPanel: (panel: ActivePanel) => void;
 }) {
   return (
     <nav className="glass fixed left-0 top-0 z-40 hidden h-full w-64 flex-col p-6 shadow-glass md:flex">
       <div className="mb-12 px-2">
-        <div className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3 rounded-lg outline-none ring-primary/30 transition hover:bg-white/40 focus-visible:ring-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white">
             <Building2 size={21} />
           </div>
@@ -1036,9 +1140,9 @@ function SideNav({ items, activePanel, onNavChange }: {
             <h2 className="font-display text-lg font-extrabold">TownReach</h2>
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Outreach OS</p>
           </div>
-        </div>
+        </Link>
       </div>
-      <NavLinkList items={items} activePanel={activePanel} onSelect={onNavChange} />
+      <NavLinkList items={items} pathname={pathname} activePanel={activePanel} onSelectPanel={onNavPanel} />
     </nav>
   );
 }
@@ -1359,27 +1463,59 @@ function WebSearchResultsList({
 
 function PastSearchesPanel({
   searches,
+  variant = "compact",
+  onDeleteEntry,
+  onClearAll,
   onEmailFromHistory
 }: {
   searches: PastSearchEntry[];
+  variant?: "compact" | "page";
+  onDeleteEntry?: (id: string) => void;
+  onClearAll?: () => void;
   onEmailFromHistory?: (candidate: WebSearchCandidate, entry: PastSearchEntry, selectedEmail: string) => void;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (expandedId && !searches.some((x) => x.id === expandedId)) setExpandedId(null);
+  }, [searches, expandedId]);
+
+  const sectionClass =
+    variant === "page"
+      ? "col-span-12 flex max-h-[min(calc(100dvh-13rem),52rem)] flex-col rounded-2xl border border-white bg-white p-4 shadow-soft sm:p-6"
+      : "col-span-12 flex max-h-[min(32rem,70vh)] flex-col rounded-2xl border border-white bg-white p-4 shadow-soft sm:p-6 lg:col-span-4";
+
+  const emptyHint =
+    variant === "page"
+      ? "No saved searches yet. Run a public contact lookup from the dashboard to build history here."
+      : "Run a search from the filters above. Your history will appear here.";
+
   return (
-    <section className="col-span-12 flex max-h-[min(32rem,70vh)] flex-col rounded-2xl border border-white bg-white p-4 shadow-soft sm:p-6 lg:col-span-4">
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
-          <History size={22} />
+    <section className={sectionClass}>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+            <History size={22} />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-display text-lg font-semibold sm:text-xl">Past searches</h3>
+            <p className="text-xs text-slate-500">Each public contact search is saved on this device.</p>
+          </div>
         </div>
-        <div className="min-w-0">
-          <h3 className="font-display text-lg font-semibold sm:text-xl">Past searches</h3>
-          <p className="text-xs text-slate-500">Each public contact search is saved on this device.</p>
-        </div>
+        {onClearAll && searches.length > 0 ? (
+          <button
+            type="button"
+            onClick={onClearAll}
+            className="focus-ring shrink-0 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-50"
+          >
+            Clear all
+          </button>
+        ) : null}
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1">
         {searches.length === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-8 text-center text-sm text-slate-500">
-            Run a search from the filters above. Your history will appear here.
+            {emptyHint}
           </p>
         ) : (
           searches.map((s) => {
@@ -1390,20 +1526,32 @@ function PastSearchesPanel({
             const timeLabel = Number.isNaN(when.getTime()) ? s.at : when.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
             return (
               <div key={s.id} className="overflow-hidden rounded-xl border border-slate-100 bg-slate-50/80">
-                <button
-                  type="button"
-                  onClick={() => setExpandedId((id) => (id === s.id ? null : s.id))}
-                  className="flex w-full items-start gap-2 px-3 py-3 text-left transition hover:bg-white"
-                >
-                  <ChevronDown className={`mt-0.5 shrink-0 text-slate-400 transition-transform ${expanded ? "rotate-180" : ""}`} size={18} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-slate-900">{summary}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">{timeLabel}</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-600">
-                      {s.error ? <span className="text-red-600">Error</span> : `${count} email${count !== 1 ? "s" : ""} found`}
-                    </p>
-                  </div>
-                </button>
+                <div className="flex items-stretch">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId((id) => (id === s.id ? null : s.id))}
+                    className="flex min-w-0 flex-1 items-start gap-2 px-3 py-3 text-left transition hover:bg-white"
+                  >
+                    <ChevronDown className={`mt-0.5 shrink-0 text-slate-400 transition-transform ${expanded ? "rotate-180" : ""}`} size={18} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-slate-900">{summary}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">{timeLabel}</p>
+                      <p className="mt-1 text-xs font-semibold text-slate-600">
+                        {s.error ? <span className="text-red-600">Error</span> : `${count} email${count !== 1 ? "s" : ""} found`}
+                      </p>
+                    </div>
+                  </button>
+                  {onDeleteEntry ? (
+                    <button
+                      type="button"
+                      aria-label={`Remove past search: ${summary}`}
+                      onClick={() => onDeleteEntry(s.id)}
+                      className="flex w-12 shrink-0 items-center justify-center border-l border-slate-200 text-slate-500 transition hover:bg-red-50 hover:text-red-700"
+                    >
+                      <Trash2 size={18} aria-hidden />
+                    </button>
+                  ) : null}
+                </div>
                 {expanded && (
                   <div className="space-y-4 border-t border-slate-200 bg-white px-3 py-4">
                     <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
