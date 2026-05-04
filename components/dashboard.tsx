@@ -1073,15 +1073,14 @@ function FilterBar(props: {
   const townDisabled = !props.countyId || props.placesLoading;
   const deptDisabled = !props.municipalityId;
   const searchDisabled = props.searchDisabled ?? false;
-  const searchLabelShort = props.searching ? "Searching…" : "Search";
-  const searchLabelLong = props.searching ? "Searching the web…" : "Search public contacts";
+  const searchLabel = props.searching ? "Searching the web…" : "Search public contacts";
   return (
     <section
       id={props.id}
       className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/90 p-4 shadow-md ring-1 ring-slate-950/[0.04] sm:p-5"
     >
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-4">
-        <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-3">
+      <div className="flex flex-col gap-3">
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-3">
           <FilterSelect label="State" value={props.stateId} onChange={props.onStateChange} disabled={false}>
             <option value="">Select state</option>
             {props.data.states.map((s) => (
@@ -1116,38 +1115,17 @@ function FilterBar(props: {
             ))}
           </FilterSelect>
         </div>
-        <button
-          type="button"
-          onClick={props.onSparkle}
-          disabled={props.searching || searchDisabled}
-          aria-label={searchLabelLong}
-          title={searchLabelLong}
-          className={`group relative inline-flex h-[3.25rem] w-full shrink-0 items-center justify-center gap-3 overflow-hidden rounded-2xl px-5 text-white shadow-[0_4px_20px_rgba(0,88,188,0.35)] ring-1 ring-white/25 transition sm:h-14 sm:px-6 lg:h-auto lg:min-h-[3.5rem] lg:w-[11.5rem] lg:gap-2.5 lg:self-end lg:px-4 xl:w-[12rem] ${
-            searchDisabled && !props.searching
-              ? "cursor-not-allowed bg-slate-400/90 shadow-none ring-slate-300/50"
-              : "bg-gradient-to-br from-primary via-primary to-primary-container hover:shadow-[0_6px_28px_rgba(0,88,188,0.45)] hover:ring-white/35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.98] active:brightness-95 disabled:cursor-wait disabled:opacity-100"
-          }`}
-        >
-          {!searchDisabled || props.searching ? (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/[0.12] to-transparent opacity-70 transition group-hover:opacity-100"
-            />
-          ) : null}
-          <span className="relative flex w-full items-center justify-center gap-3 lg:w-auto lg:gap-2.5">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/30 bg-white/15 shadow-inner backdrop-blur-[2px] sm:h-11 sm:w-11 lg:h-10 lg:w-10">
-              {props.searching ? (
-                <RefreshCw size={20} className="animate-spin text-white" aria-hidden />
-              ) : (
-                <Search size={20} className="text-white" strokeWidth={2.25} aria-hidden />
-              )}
-            </span>
-            <span className="min-w-0 flex-1 text-left font-display text-[0.9375rem] font-bold leading-tight tracking-tight sm:text-base lg:flex-none lg:text-center">
-              <span className="block lg:hidden">{searchLabelLong}</span>
-              <span className="hidden lg:block">{searchLabelShort}</span>
-            </span>
-          </span>
-        </button>
+        <div className="flex justify-center pt-1">
+          <button
+            type="button"
+            onClick={props.onSparkle}
+            disabled={props.searching || searchDisabled}
+            className="flex h-11 w-full max-w-xl items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-center text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:h-12 sm:max-w-2xl sm:px-6"
+          >
+            {props.searching ? <RefreshCw size={17} className="animate-spin shrink-0" aria-hidden /> : <Sparkles size={17} className="shrink-0" aria-hidden />}
+            <span className="text-center text-sm font-bold">{searchLabel}</span>
+          </button>
+        </div>
       </div>
     </section>
   );
