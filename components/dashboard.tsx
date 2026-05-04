@@ -472,14 +472,8 @@ export function Dashboard({ data }: DashboardProps) {
         items={navItems}
         activePanel={activePanel}
         onNavChange={setActivePanel}
-        hasEmailConnection={emailSettings.gmailConnected || emailSettings.outlookConnected}
       />
-      <SideNav
-        items={navItems}
-        activePanel={activePanel}
-        onNavChange={setActivePanel}
-        hasEmailConnection={emailSettings.gmailConnected || emailSettings.outlookConnected}
-      />
+      <SideNav items={navItems} activePanel={activePanel} onNavChange={setActivePanel} />
       <TopBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -734,6 +728,11 @@ export function Dashboard({ data }: DashboardProps) {
         department={selectedContact ? data.departments.find((d) => d.id === selectedContact.departmentId) : undefined}
         emailSettings={emailSettings}
         onClose={() => setDrawerOpen(false)}
+        onOpenEmailSettings={() => {
+          setDrawerOpen(false);
+          setMobileNavOpen(false);
+          setActivePanel("settings");
+        }}
         onThreadCreated={(thread) => setThreads((current) => [thread, ...current])}
       />
     </div>
@@ -764,24 +763,12 @@ function NavLinkList({ items, activePanel, onSelect }: {
   );
 }
 
-function NavPromoCard({ className = "", hasEmailConnection }: { className?: string; hasEmailConnection: boolean }) {
-  return (
-    <div className={`rounded-xl bg-slate-950 p-4 text-white shadow-glass ${className}`}>
-      <p className="text-sm font-bold">Connect Gmail or Outlook</p>
-      <p className="mt-1 text-xs leading-5 text-slate-300">
-        {hasEmailConnection ? "At least one inbox is connected." : "Open Admin Settings to connect your inbox."}
-      </p>
-    </div>
-  );
-}
-
-function MobileNavSheet({ open, onClose, items, activePanel, onNavChange, hasEmailConnection }: {
+function MobileNavSheet({ open, onClose, items, activePanel, onNavChange }: {
   open: boolean;
   onClose: () => void;
   items: { icon: React.ElementType; label: string; panel: ActivePanel }[];
   activePanel: ActivePanel;
   onNavChange: (panel: ActivePanel) => void;
-  hasEmailConnection: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -836,17 +823,15 @@ function MobileNavSheet({ open, onClose, items, activePanel, onNavChange, hasEma
             }}
           />
         </div>
-        <NavPromoCard className="mt-4 shrink-0" hasEmailConnection={hasEmailConnection} />
       </nav>
     </div>
   );
 }
 
-function SideNav({ items, activePanel, onNavChange, hasEmailConnection }: {
+function SideNav({ items, activePanel, onNavChange }: {
   items: { icon: React.ElementType; label: string; panel: ActivePanel }[];
   activePanel: ActivePanel;
   onNavChange: (panel: ActivePanel) => void;
-  hasEmailConnection: boolean;
 }) {
   return (
     <nav className="glass fixed left-0 top-0 z-40 hidden h-full w-64 flex-col p-6 shadow-glass md:flex">
@@ -862,7 +847,6 @@ function SideNav({ items, activePanel, onNavChange, hasEmailConnection }: {
         </div>
       </div>
       <NavLinkList items={items} activePanel={activePanel} onSelect={onNavChange} />
-      <NavPromoCard className="mt-auto" hasEmailConnection={hasEmailConnection} />
     </nav>
   );
 }
@@ -1573,9 +1557,24 @@ function MapPanel({
   );
 }
 
-function ComposerDrawer({ open, contact, municipality, department, emailSettings, onClose, onThreadCreated }: {
-  open: boolean; contact: ContactRecord | null; municipality?: MunicipalityRecord; department?: DepartmentRecord; emailSettings: EmailConnectionSettings;
-  onClose: () => void; onThreadCreated: (thread: OutreachThread) => void;
+function ComposerDrawer({
+  open,
+  contact,
+  municipality,
+  department,
+  emailSettings,
+  onClose,
+  onOpenEmailSettings,
+  onThreadCreated
+}: {
+  open: boolean;
+  contact: ContactRecord | null;
+  municipality?: MunicipalityRecord;
+  department?: DepartmentRecord;
+  emailSettings: EmailConnectionSettings;
+  onClose: () => void;
+  onOpenEmailSettings: () => void;
+  onThreadCreated: (thread: OutreachThread) => void;
 }) {
   const [templateId, setTemplateId] = useState(emailTemplates[0].id);
   const [provider, setProvider] = useState<"gmail" | "outlook">("gmail");
@@ -1586,7 +1585,6 @@ function ComposerDrawer({ open, contact, municipality, department, emailSettings
 
   const template = emailTemplates.find((t) => t.id === templateId) ?? emailTemplates[0];
   const isProviderConnected = provider === "gmail" ? emailSettings.gmailConnected : emailSettings.outlookConnected;
-  const anyProviderConnected = emailSettings.gmailConnected || emailSettings.outlookConnected;
   const variables = useMemo(() => ({
     contactName: contact?.name,
     companyName: emailSettings.senderCompany || sender.companyName,
@@ -1672,15 +1670,54 @@ function ComposerDrawer({ open, contact, municipality, department, emailSettings
                   </button>
                 ))}
               </div>
-              {!anyProviderConnected && (
-                <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
-                  Connect Gmail or Outlook in Admin Settings before sending.
-                </p>
-              )}
-              {anyProviderConnected && !isProviderConnected && (
-                <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
-                  The selected provider is not connected. Switch provider or connect it in Admin Settings.
-                </p>
+              {!isProviderConnected && (
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-sm font-bold text-amber-950">
+                    {provider === "gmail" && !emailSettings.gmailConnected
+                      ? "Connect Gmail to send"
+                      : provider === "outlook" && !emailSettings.outlookConnected
+                        ? "Enable Outlook to send (demo)"
+                        : "Choose a connected inbox"}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-amber-900">
+                    {provider === "gmail"
+                      ? "Use Google sign-in so TownReach can send from your Gmail."
+                      : "Turn on the simulated Outlook option under Admin Settings, or switch to Gmail above."}
+                  </p>
+                  <div className="mt-3 flex flex-col gap-2">
+                    {provider === "gmail" && !emailSettings.gmailConnected && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          window.location.assign("/connect/gmail");
+                        }}
+                        className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary-container"
+                      >
+                        <Mail size={16} aria-hidden />
+                        Connect Gmail
+                      </button>
+                    )}
+                    {provider === "outlook" && !emailSettings.outlookConnected && (
+                      <button
+                        type="button"
+                        onClick={onOpenEmailSettings}
+                        className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary-container"
+                      >
+                        <Settings size={16} aria-hidden />
+                        Open Admin Settings
+                      </button>
+                    )}
+                    {provider === "gmail" && !emailSettings.gmailConnected && (
+                      <button
+                        type="button"
+                        onClick={onOpenEmailSettings}
+                        className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-amber-900/20 bg-white px-4 py-2.5 text-sm font-semibold text-amber-950 transition hover:bg-amber-100/60"
+                      >
+                        Admin Settings
+                      </button>
+                    )}
+                  </div>
+                </div>
               )}
               <label className="mt-5 block">
                 <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Template</span>
