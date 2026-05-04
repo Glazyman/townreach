@@ -3,6 +3,7 @@
 import {
   Bell,
   Building2,
+  CheckCircle2,
   ChevronDown,
   Gauge,
   HelpCircle,
@@ -1648,6 +1649,19 @@ function ComposerDrawer({
             </div>
             <button type="button" onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100" aria-label="Close composer"><X size={20} /></button>
           </div>
+          {sendState === "sent" && (
+            <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-4 sm:px-6" role="status" aria-live="polite">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-600" size={22} aria-hidden />
+                <div className="min-w-0">
+                  <p className="text-base font-bold text-emerald-950">Email sent</p>
+                  <p className="mt-1 text-sm leading-5 text-emerald-900">
+                    Your message was sent successfully. This thread is now in response tracking so you can follow replies.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           {contact && municipality && department ? (
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
               <div className="rounded-2xl bg-slate-50 p-4">
@@ -1738,12 +1752,32 @@ function ComposerDrawer({
             <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-slate-500">Select a verified contact to compose an email.</div>
           )}
           <div className="border-t border-slate-100 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6 sm:pb-6">
-            <button type="button" onClick={sendEmail} disabled={!contact || sendState === "sending" || !isProviderConnected} className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-primary font-bold text-white transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-50">
-              <Send size={18} />
-              {sendState === "sending" ? "Sending..." : "Send through user inbox"}
+            <button
+              type="button"
+              onClick={sendState === "sent" ? onClose : sendEmail}
+              disabled={
+                sendState === "sending" || (sendState !== "sent" && (!contact || !isProviderConnected))
+              }
+              className={`flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                sendState === "sent"
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : "bg-primary hover:bg-primary-container"
+              }`}
+            >
+              {sendState === "sent" ? (
+                <>
+                  <CheckCircle2 size={18} aria-hidden />
+                  Done
+                </>
+              ) : (
+                <>
+                  <Send size={18} aria-hidden />
+                  {sendState === "sending" ? "Sending..." : "Send through user inbox"}
+                </>
+              )}
             </button>
             <p className="mt-3 text-center text-xs text-slate-500">
-              {sendState === "sent" && "Sent and added to response tracking."}
+              {sendState === "sent" && <span className="font-medium text-emerald-800">Use Done above to close the composer.</span>}
               {sendState === "error" && (
                 <span className="text-red-700">
                   {sendErrorDetail ? sendErrorDetail : "Something went wrong sending this email."}
