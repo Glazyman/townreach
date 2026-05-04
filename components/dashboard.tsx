@@ -30,6 +30,7 @@ const CoverageMap = dynamic(
   () => import("@/components/coverage-map").then((m) => m.CoverageMap),
   { ssr: false }
 );
+import { greetingFirstName, polishSalutationSpacing } from "@/lib/contact-greeting";
 import { tokenReplace } from "@/lib/data";
 import { getDefaultEmailTemplates, loadStoredEmailTemplates, saveStoredEmailTemplates } from "@/lib/email-templates-storage";
 import type {
@@ -80,6 +81,23 @@ type PastSearchEntry = {
   error?: string;
   note?: string;
 };
+
+/** Stable unique id for web-sourced contacts (avoids React/state skips on rapid clicks). */
+function newWebContactId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `web-${crypto.randomUUID()}`;
+  }
+  return `web-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
+/** Deep-clone candidates so past searches are not aliased to live `searchResults` or mutated in place. */
+function cloneWebCandidates(candidates: WebSearchCandidate[]): WebSearchCandidate[] {
+  return candidates.map((c) => ({
+    ...c,
+    allEmails: c.allEmails?.length ? [...c.allEmails] : undefined,
+    allPhones: c.allPhones?.length ? [...c.allPhones] : undefined
+  }));
+}
 
 const PAST_SEARCHES_STORAGE_KEY = "townreach-past-searches";
 const MAX_PAST_SEARCHES = 50;
@@ -184,7 +202,13 @@ export function Dashboard({ data }: DashboardProps) {
       const raw = localStorage.getItem(PAST_SEARCHES_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as PastSearchEntry[];
-        if (Array.isArray(parsed)) setPastSearches(parsed.slice(0, MAX_PAST_SEARCHES));
+        if (Array.isArray(parsed)) {
+          const slice = parsed.slice(0, MAX_PAST_SEARCHES).map((entry) => ({
+            ...entry,
+            candidates: cloneWebCandidates(Array.isArray(entry.candidates) ? entry.candidates : [])
+          }));
+          setPastSearches(slice);
+        }
       }
     } catch {
       /* ignore */
@@ -420,6 +444,8 @@ export function Dashboard({ data }: DashboardProps) {
 
   const closeComposer = useCallback(() => {
     setDrawerOpen(false);
+    setSelectedContact(null);
+    setComposerMunicipality(undefined);
   }, []);
 
   async function handleSparkle() {
@@ -443,7 +469,11 @@ export function Dashboard({ data }: DashboardProps) {
         departmentName: effectiveDepartment.name
       };
       function pushPast(entry: PastSearchEntry) {
-        setPastSearches((prev) => [entry, ...prev].slice(0, MAX_PAST_SEARCHES));
+        const safe: PastSearchEntry = {
+          ...entry,
+          candidates: cloneWebCandidates(entry.candidates ?? [])
+        };
+        setPastSearches((prev) => [safe, ...prev].slice(0, MAX_PAST_SEARCHES));
       }
       try {
         const params = new URLSearchParams({
@@ -458,7 +488,7 @@ export function Dashboard({ data }: DashboardProps) {
           pushPast({ ...entryBase, candidates: [], error: msg });
           throw new Error(msg);
         }
-        const candidates = (json.candidates ?? []) as WebSearchCandidate[];
+        const candidates = cloneWebCandidates((json.candidates ?? []) as WebSearchCandidate[]);
         setSearchResults(candidates);
         const emptyNote =
           candidates.length === 0
@@ -557,10 +587,15 @@ export function Dashboard({ data }: DashboardProps) {
                     const dept = effectiveDepartment;
                     if (!dept || !selectedMunicipality) return;
                     const contact: ContactRecord = {
-                      id: `web-${Date.now()}`,
+                      id: newWebContactId(),
                       municipalityId: municipalityId,
                       departmentId: dept.id,
-                      name: candidate.name || candidate.pageTitle,
+                      name: greetingFirstName({
+                        name: candidate.name,
+                        pageTitle: candidate.pageTitle,
+                        snippet: candidate.snippet,
+                        email: selectedEmail
+                      }),
                       title: candidate.title,
                       email: selectedEmail,
                       phone: candidate.phone,
@@ -610,13 +645,18 @@ export function Dashboard({ data }: DashboardProps) {
                     setCountyId(entry.countyId);
                     setMunicipalityId(entry.municipalityId);
                     setDepartmentId(entry.departmentId);
-                    setSearchResults(entry.candidates);
+                    setSearchResults(cloneWebCandidates(entry.candidates));
                     setSearchError("");
                     const contact: ContactRecord = {
-                      id: `web-${Date.now()}`,
+                      id: newWebContactId(),
                       municipalityId: entry.municipalityId,
                       departmentId: entry.departmentId,
-                      name: candidate.name || candidate.pageTitle,
+                      name: greetingFirstName({
+                        name: candidate.name,
+                        pageTitle: candidate.pageTitle,
+                        snippet: candidate.snippet,
+                        email: selectedEmail
+                      }),
                       title: candidate.title,
                       email: selectedEmail,
                       phone: candidate.phone,
@@ -633,6 +673,7 @@ export function Dashboard({ data }: DashboardProps) {
                       kind: "city",
                       placeFips: ""
                     };
+                    setActivePanel("dashboard");
                     openComposer(contact, hint);
                   }}
                 />
@@ -752,6 +793,7 @@ export function Dashboard({ data }: DashboardProps) {
       </main>
 
       <ComposerDrawer
+        key={selectedContact ? `${selectedContact.id}-${selectedContact.email}` : "composer-closed"}
         open={drawerOpen}
         contact={selectedContact}
         municipality={composerMunicipality}
@@ -1383,6 +1425,7 @@ function PastSearchesPanel({
                     )}
                     {s.candidates.length > 0 && (
                       <WebSearchResultsList
+                        key={s.id}
                         className="mt-0"
                         results={s.candidates}
                         municipality={{
@@ -1844,21 +1887,38 @@ function ComposerDrawer({
   }, [templates, templateId]);
 
   const isProviderConnected = provider === "gmail" ? emailSettings.gmailConnected : emailSettings.outlookConnected;
-  const variables = useMemo(() => ({
-    contactName: contact?.name,
-    companyName: emailSettings.senderCompany || sender.companyName,
-    senderName: emailSettings.senderName || sender.senderName,
-    municipality: municipality?.name, departmentName: department?.name
-  }), [contact?.name, department?.name, emailSettings.senderCompany, emailSettings.senderName, municipality?.name]);
+  const greetingContactName = useMemo(
+    () =>
+      contact?.email
+        ? greetingFirstName({ name: contact.name, email: contact.email })
+        : "",
+    [contact?.name, contact?.email]
+  );
+  const variables = useMemo(
+    () => ({
+      contactName: greetingContactName,
+      companyName: emailSettings.senderCompany || sender.companyName,
+      senderName: emailSettings.senderName || sender.senderName,
+      municipality: municipality?.name,
+      departmentName: department?.name
+    }),
+    [
+      greetingContactName,
+      department?.name,
+      emailSettings.senderCompany,
+      emailSettings.senderName,
+      municipality?.name
+    ]
+  );
 
   useEffect(() => {
     const t = templates.find((x) => x.id === templateId) ?? templates[0];
     if (!t) return;
-    setSubject(tokenReplace(t.subject, variables));
-    setBody(tokenReplace(t.body, variables));
+    setSubject(polishSalutationSpacing(tokenReplace(t.subject, variables)));
+    setBody(polishSalutationSpacing(tokenReplace(t.body, variables)));
     setSendState("idle");
     setSendErrorDetail("");
-  }, [templates, templateId, contact?.id, variables]);
+  }, [templates, templateId, contact?.id, contact?.email, variables]);
 
   async function sendEmail() {
     if (!contact || !department || !municipality || !isProviderConnected) return;
@@ -1925,7 +1985,7 @@ function ComposerDrawer({
           {contact && municipality && department ? (
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
               <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-sm font-bold">{contact.name}</p>
+                <p className="text-sm font-bold">{contact.name || contact.email}</p>
                 <p className="mt-1 text-sm text-slate-600">{contact.title}</p>
                 <p className="mt-2 text-sm text-primary">{contact.email}</p>
                 <p className="mt-3 text-xs text-slate-500">{municipality.name} / {department.name} / verified {contact.lastChecked}</p>

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { greetingFirstName } from "@/lib/contact-greeting";
 import {
   extractEmailsFromText,
   filterAcceptableEmails,
@@ -87,7 +88,14 @@ function buildCandidate(item: SerperResult, municipality: string, department: st
   const text = `${item.title} ${item.snippet}`;
   const emails = filterAcceptableEmails(extractEmailsFromText(text));
   const phones = extractAllPhones(text);
-  const name = extractName(text);
+  const nameFromPatterns = extractName(text);
+  const name =
+    nameFromPatterns ||
+    greetingFirstName({
+      pageTitle: item.title,
+      snippet: item.snippet,
+      email: emails[0] ?? ""
+    });
 
   return {
     name,
