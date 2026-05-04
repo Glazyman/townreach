@@ -137,6 +137,7 @@ export function Dashboard({ data }: DashboardProps) {
   const [placesLoading, setPlacesLoading] = useState(false);
   const [geographyError, setGeographyError] = useState("");
   const [selectedContact, setSelectedContact] = useState<ContactRecord | null>(null);
+  const [composerMunicipality, setComposerMunicipality] = useState<MunicipalityRecord | undefined>(undefined);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [threads, setThreads] = useState<OutreachThread[]>(data.threads);
   const [intentQuery, setIntentQuery] = useState("");
@@ -180,13 +181,14 @@ export function Dashboard({ data }: DashboardProps) {
       const raw = localStorage.getItem(EMAIL_SETTINGS_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as Partial<EmailConnectionSettings>;
-        setEmailSettings({
-          gmailConnected: Boolean(parsed.gmailConnected),
+        setEmailSettings((prev) => ({
+          ...prev,
+          // Gmail connection comes from the server cookie, not localStorage (avoids stale false).
           outlookConnected: Boolean(parsed.outlookConnected),
           senderName: parsed.senderName?.trim() || defaultEmailSettings.senderName,
           senderCompany: parsed.senderCompany?.trim() || defaultEmailSettings.senderCompany,
           senderEmail: parsed.senderEmail?.trim() || ""
-        });
+        }));
       }
     } catch {
       /* ignore */
@@ -372,7 +374,24 @@ export function Dashboard({ data }: DashboardProps) {
     }
   }
 
-  function openComposer(contact: ContactRecord) { setSelectedContact(contact); setDrawerOpen(true); }
+  function openComposer(contact: ContactRecord, municipalityHint?: MunicipalityRecord) {
+    setSelectedContact(contact);
+    const resolved =
+      municipalityHint ??
+      filteredMunicipalities.find((m) => m.id === contact.municipalityId) ??
+      data.municipalities.find((m) => m.id === contact.municipalityId);
+    setComposerMunicipality(
+      resolved ?? {
+        id: contact.municipalityId,
+        countyId: countyId || "",
+        stateId: stateId || "",
+        name: selectedMunicipality?.id === contact.municipalityId ? selectedMunicipality.name : "Selected municipality",
+        kind: "city",
+        placeFips: ""
+      }
+    );
+    setDrawerOpen(true);
+  }
 
   async function handleSparkle() {
     if (readyForLookup && selectedMunicipality && effectiveDepartment) {
@@ -513,7 +532,7 @@ export function Dashboard({ data }: DashboardProps) {
                   department={effectiveDepartment}
                   onEmail={(candidate) => {
                     const dept = effectiveDepartment;
-                    if (!dept) return;
+                    if (!dept || !selectedMunicipality) return;
                     const contact: ContactRecord = {
                       id: `web-${Date.now()}`,
                       municipalityId: municipalityId,
@@ -527,7 +546,7 @@ export function Dashboard({ data }: DashboardProps) {
                       verified: false,
                       lastChecked: new Date().toISOString().split("T")[0]
                     };
-                    openComposer(contact);
+                    openComposer(contact, selectedMunicipality);
                   }}
                 />
               )}
@@ -583,7 +602,15 @@ export function Dashboard({ data }: DashboardProps) {
                       verified: false,
                       lastChecked: new Date().toISOString().split("T")[0]
                     };
-                    openComposer(contact);
+                    const hint: MunicipalityRecord = {
+                      id: entry.municipalityId,
+                      countyId: entry.countyId,
+                      stateId: entry.stateId,
+                      name: entry.municipalityName,
+                      kind: "city",
+                      placeFips: ""
+                    };
+                    openComposer(contact, hint);
                   }}
                 />
                 <InboxPanel threads={threads} contacts={data.contacts} onThreadsUpdate={setThreads} />
@@ -703,7 +730,7 @@ export function Dashboard({ data }: DashboardProps) {
       <ComposerDrawer
         open={drawerOpen}
         contact={selectedContact}
-        municipality={selectedContact ? data.municipalities.find((m) => m.id === selectedContact.municipalityId) : undefined}
+        municipality={composerMunicipality}
         department={selectedContact ? data.departments.find((d) => d.id === selectedContact.departmentId) : undefined}
         emailSettings={emailSettings}
         onClose={() => setDrawerOpen(false)}
@@ -1553,6 +1580,7 @@ function ComposerDrawer({ open, contact, municipality, department, emailSettings
   const [templateId, setTemplateId] = useState(emailTemplates[0].id);
   const [provider, setProvider] = useState<"gmail" | "outlook">("gmail");
   const [sendState, setSendState] = useState<SendState>("idle");
+  const [sendErrorDetail, setSendErrorDetail] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
 
@@ -1570,15 +1598,18 @@ function ComposerDrawer({ open, contact, municipality, department, emailSettings
     setSubject(tokenReplace(template.subject, variables));
     setBody(tokenReplace(template.body, variables));
     setSendState("idle");
+    setSendErrorDetail("");
   }, [template.body, template.subject, templateId, contact?.id, variables]);
 
   async function sendEmail() {
     if (!contact || !department || !municipality || !isProviderConnected) return;
     setSendState("sending");
+    setSendErrorDetail("");
     try {
       const res = await fetch("/api/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({
           provider,
           to: contact.email,
@@ -1592,11 +1623,15 @@ function ComposerDrawer({ open, contact, municipality, department, emailSettings
           senderEmail: emailSettings.senderEmail
         })
       });
-      const result = await res.json();
+      const result = (await res.json()) as { error?: string; thread?: OutreachThread };
       if (!res.ok) throw new Error(result.error ?? "Unable to send");
+      if (!result.thread) throw new Error("Invalid response from server.");
       onThreadCreated(result.thread);
       setSendState("sent");
-    } catch { setSendState("error"); }
+    } catch (e) {
+      setSendState("error");
+      setSendErrorDetail(e instanceof Error ? e.message : "Send failed");
+    }
   }
 
   return (
@@ -1672,8 +1707,19 @@ function ComposerDrawer({ open, contact, municipality, department, emailSettings
             </button>
             <p className="mt-3 text-center text-xs text-slate-500">
               {sendState === "sent" && "Sent and added to response tracking."}
-              {sendState === "error" && "Something went wrong sending this email."}
-              {sendState === "idle" && (isProviderConnected ? "Local mode simulates send with your configured sender profile." : "Connect the selected provider in Admin Settings to send.")}
+              {sendState === "error" && (
+                <span className="text-red-700">
+                  {sendErrorDetail ? sendErrorDetail : "Something went wrong sending this email."}
+                </span>
+              )}
+              {sendState === "idle" &&
+                (isProviderConnected
+                  ? provider === "gmail" && emailSettings.gmailConnected
+                    ? "Sends through your connected Gmail inbox."
+                    : provider === "outlook"
+                      ? "Outlook sending is simulated in this build."
+                      : "Ready to send."
+                  : "Connect the selected provider in Admin Settings to send.")}
             </p>
           </div>
         </div>
