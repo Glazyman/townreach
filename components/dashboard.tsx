@@ -1122,11 +1122,31 @@ function FilterBar(props: {
           disabled={props.searching || searchDisabled}
           aria-label={searchLabelLong}
           title={searchLabelLong}
-          className="inline-flex h-[3.25rem] w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:h-14 lg:h-auto lg:min-h-[3.5rem] lg:w-[9.25rem] lg:self-end lg:px-4 xl:w-[10rem]"
+          className={`group relative inline-flex h-[3.25rem] w-full shrink-0 items-center justify-center gap-3 overflow-hidden rounded-2xl px-5 text-white shadow-[0_4px_20px_rgba(0,88,188,0.35)] ring-1 ring-white/25 transition sm:h-14 sm:px-6 lg:h-auto lg:min-h-[3.5rem] lg:w-[11.5rem] lg:gap-2.5 lg:self-end lg:px-4 xl:w-[12rem] ${
+            searchDisabled && !props.searching
+              ? "cursor-not-allowed bg-slate-400/90 shadow-none ring-slate-300/50"
+              : "bg-gradient-to-br from-primary via-primary to-primary-container hover:shadow-[0_6px_28px_rgba(0,88,188,0.45)] hover:ring-white/35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.98] active:brightness-95 disabled:cursor-wait disabled:opacity-100"
+          }`}
         >
-          {props.searching ? <RefreshCw size={18} className="animate-spin shrink-0" aria-hidden /> : <Sparkles size={18} className="shrink-0" aria-hidden />}
-          <span className="text-sm font-bold tracking-tight lg:hidden">{searchLabelLong}</span>
-          <span className="hidden text-sm font-bold tracking-tight lg:inline">{searchLabelShort}</span>
+          {!searchDisabled || props.searching ? (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/[0.12] to-transparent opacity-70 transition group-hover:opacity-100"
+            />
+          ) : null}
+          <span className="relative flex w-full items-center justify-center gap-3 lg:w-auto lg:gap-2.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/30 bg-white/15 shadow-inner backdrop-blur-[2px] sm:h-11 sm:w-11 lg:h-10 lg:w-10">
+              {props.searching ? (
+                <RefreshCw size={20} className="animate-spin text-white" aria-hidden />
+              ) : (
+                <Search size={20} className="text-white" strokeWidth={2.25} aria-hidden />
+              )}
+            </span>
+            <span className="min-w-0 flex-1 text-left font-display text-[0.9375rem] font-bold leading-tight tracking-tight sm:text-base lg:flex-none lg:text-center">
+              <span className="block lg:hidden">{searchLabelLong}</span>
+              <span className="hidden lg:block">{searchLabelShort}</span>
+            </span>
+          </span>
         </button>
       </div>
     </section>
