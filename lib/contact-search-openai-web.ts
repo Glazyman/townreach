@@ -111,6 +111,11 @@ function toSignificantTokens(raw: string): string[] {
     .filter((x) => x.length >= 4);
 }
 
+function hostContainsMunicipalityToken(host: string, municipality: string): boolean {
+  const h = host.toLowerCase().replace(/^www\./, "");
+  return toSignificantTokens(municipality).some((t) => h.includes(t));
+}
+
 function hostScore(host: string, municipality: string, state: string): number {
   const h = host.toLowerCase().replace(/^www\./, "");
   const muniTokens = toSignificantTokens(municipality);
@@ -245,6 +250,56 @@ export async function gatherContactsViaOpenAiWebSearch(params: {
     process.env.OPENAI_WEB_CONTACT_MODEL?.trim() ||
     process.env.OPENAI_MODEL?.trim() ||
     "gpt-4.1-mini";
+  const toolsA = [{ type: "web_search" as const, search_context_size: "high" as const }];
+
+  async function runResponsesWebSearch(userText: string) {
+    const bodyBase = {
+      model,
+      tool_choice: "required" as const,
+      temperature: 0.3,
+      input: [
+        {
+          role: "user" as const,
+          content: [{ type: "input_text" as const, text: userText }]
+        }
+      ]
+    };
+
+    let res = await fetch(RESPONSES_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ ...bodyBase, tools: toolsA }),
+      signal: AbortSignal.timeout(120_000)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      const fallbackTools = [{ type: "web_search_preview" as const }];
+      const res2 = await fetch(RESPONSES_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          ...bodyBase,
+          tools: fallbackTools,
+          tool_choice: "auto"
+        }),
+        signal: AbortSignal.timeout(120_000)
+      });
+      if (!res2.ok) {
+        throw new Error(
+          `OpenAI Responses error ${res.status}: ${errText.slice(0, 200)} · fallback ${res2.status}`
+        );
+      }
+      res = res2;
+    }
+    return res.json() as Promise<{ output?: unknown; model?: string }>;
+  }
 
   const userText = [
     `Place: "${params.municipality}", ${params.state}`,
@@ -259,56 +314,7 @@ export async function gatherContactsViaOpenAiWebSearch(params: {
   ]
     .filter(Boolean)
     .join("\n");
-
-  const toolsA = [{ type: "web_search" as const, search_context_size: "high" as const }];
-
-  const bodyBase = {
-    model,
-    tool_choice: "required" as const,
-    temperature: 0.3,
-    input: [
-      {
-        role: "user" as const,
-        content: [{ type: "input_text" as const, text: userText }]
-      }
-    ]
-  };
-
-  let res = await fetch(RESPONSES_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ ...bodyBase, tools: toolsA }),
-    signal: AbortSignal.timeout(120_000)
-  });
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    const fallbackTools = [{ type: "web_search_preview" as const }];
-    const res2 = await fetch(RESPONSES_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        ...bodyBase,
-        tools: fallbackTools,
-        tool_choice: "auto"
-      }),
-      signal: AbortSignal.timeout(120_000)
-    });
-    if (!res2.ok) {
-      throw new Error(
-        `OpenAI Responses error ${res.status}: ${errText.slice(0, 200)} · fallback ${res2.status}`
-      );
-    }
-    res = res2;
-  }
-
-  const data: { output?: unknown; model?: string } = await res.json();
+  const data = await runResponsesWebSearch(userText);
   const output = data.output;
   let urls = collectUrlsFromOutput(output);
   const assistText = extractAssistantText(output);
@@ -333,7 +339,23 @@ export async function gatherContactsViaOpenAiWebSearch(params: {
     }
   });
 
-  const resolvedHost = guessResolvedHost(urls, params.municipality, params.state);
+  let resolvedHost = guessResolvedHost(urls, params.municipality, params.state);
+
+  // CDP fallback: explicitly ask for governing municipality host and merge those citations.
+  if (!resolvedHost || !hostContainsMunicipalityToken(resolvedHost, params.municipality)) {
+    const governancePrompt = [
+      `Find the governing municipality website for ${params.municipality}, ${params.state}.`,
+      `Return sources for the local government that handles planning/zoning permits for this place.`,
+      `Prefer town/city/county government host, not nearby village marketing pages or state agencies.`
+    ].join(" ");
+    const governance = await runResponsesWebSearch(governancePrompt);
+    const govUrls = collectUrlsFromOutput(governance.output);
+    for (const u of govUrls) {
+      if (!urls.includes(u)) urls.push(u);
+    }
+    urls = urls.slice(0, 30);
+    resolvedHost = guessResolvedHost(urls, params.municipality, params.state);
+  }
 
   const organic: SerperOrganic[] = [];
   const seen = new Set<string>();
