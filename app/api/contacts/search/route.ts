@@ -7,6 +7,7 @@ import {
   isFetchableContactUrl
 } from "@/lib/contact-email";
 import { buildContactAssistantBrief } from "@/lib/contact-assistant-openai";
+import { filterCandidatesToJurisdiction } from "@/lib/contact-jurisdiction";
 import { gatherContactsViaOpenAiWebSearch } from "@/lib/contact-search-openai-web";
 import { crawlMunicipalDepartmentPages, discoverMunicipalHost, topicFromIntent } from "@/lib/municipal-site-search";
 
@@ -101,17 +102,20 @@ export async function GET(request: Request) {
             `building planning zoning contact email site:${host}`
           );
         }
-        queries.push(
-          `${municipality} ${state} planning board subdivision email`,
-          `${municipality} ${state} zoning board appeals email`
-        );
+      queries.push(
+        `${municipality} ${state} planning board subdivision email`,
+        `${municipality} ${state} zoning board appeals email`
+      );
       }
 
-      queries.push(
-        `${municipality} ${state} ${department}${topic} site:.gov staff directory email`,
-        `${municipality} ${state} ${department}${topic} contact email phone`,
-        `${municipality} ${state} ${department}${topic} site:.gov "@"`
-      );
+      /** Broad non–site-scoped lookups pull unrelated nearby towns — skip when anchored to official host. */
+      if (!host) {
+        queries.push(
+          `${municipality} ${state} ${department}${topic} site:.gov staff directory email`,
+          `${municipality} ${state} ${department}${topic} contact email phone`,
+          `${municipality} ${state} ${department}${topic} site:.gov "@"`
+        );
+      }
 
       const crawlOrganic = host ? await crawlMunicipalDepartmentPages(host, department, topic) : [];
 
@@ -146,9 +150,18 @@ export async function GET(request: Request) {
     const baseCandidates = organic.map((item) => buildCandidate(item, municipality, department, resolvedHost));
     const enriched = await enrichWithPageEmails(baseCandidates, resolvedHost, enrichCap);
 
-    const candidates = enriched
+    const ranked = enriched
       .filter((c) => c.email && isAcceptableOutreachEmail(c.email))
       .sort((a, b) => b.confidence - a.confidence);
+
+    let contactSearchNote: string | undefined;
+    const jurisdictionFiltered = filterCandidatesToJurisdiction(ranked, municipality, state, resolvedHost);
+    const candidates = jurisdictionFiltered;
+    if (ranked.length > 0 && candidates.length === 0) {
+      contactSearchNote = resolvedHost
+        ? `Nearby towns were excluded — we only kept pages on official host ${resolvedHost} with emails on that domain. Nothing matched those rules; try another department or a place name that matches the governing municipality if this CDP sits under one.`
+        : `Nearby towns were excluded — links had to tie clearly to "${municipality}". Nothing survived that filter; try different wording or a department closer to clerks/permitting first.`;
+    }
 
     let assistant: Awaited<ReturnType<typeof buildContactAssistantBrief>> = null;
     if (wantAssistant && candidates.length > 0) {
@@ -166,7 +179,8 @@ export async function GET(request: Request) {
       queriesUsed: queries,
       resolvedHost,
       assistant,
-      searchProvider
+      searchProvider,
+      contactSearchNote
     });
   } catch {
     return NextResponse.json({ error: "Search request failed" }, { status: 500 });

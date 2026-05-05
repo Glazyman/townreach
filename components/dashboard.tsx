@@ -19,10 +19,12 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
+  Phone,
   Send,
   Settings,
   Sparkles,
   Trash2,
+  ExternalLink,
   X
 } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -180,6 +182,8 @@ export function Dashboard({ data }: DashboardProps) {
   const [assistantGuideEnabled, setAssistantGuideEnabled] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
+  /** When filtering drops all neighbors but nothing remains (API `contactSearchNote`). */
+  const [contactSearchBanner, setContactSearchBanner] = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [pastSearches, setPastSearches] = useState<PastSearchEntry[]>([]);
   const [pastSearchesHydrated, setPastSearchesHydrated] = useState(false);
@@ -437,6 +441,7 @@ export function Dashboard({ data }: DashboardProps) {
     setSearchResolvedHost(null);
     setSearchAssistantBrief(null);
     setSearchError("");
+    setContactSearchBanner(null);
   }
   function handleCountyChange(value: string) {
     setCountyId(value);
@@ -448,6 +453,7 @@ export function Dashboard({ data }: DashboardProps) {
     setSearchResolvedHost(null);
     setSearchAssistantBrief(null);
     setSearchError("");
+    setContactSearchBanner(null);
   }
   function handleMunicipalityChange(value: string) {
     setMunicipalityId(value);
@@ -458,6 +464,7 @@ export function Dashboard({ data }: DashboardProps) {
     setSearchResolvedHost(null);
     setSearchAssistantBrief(null);
     setSearchError("");
+    setContactSearchBanner(null);
   }
 
   function handleDepartmentChange(v: string) {
@@ -468,6 +475,7 @@ export function Dashboard({ data }: DashboardProps) {
     setSearchResolvedHost(null);
     setSearchAssistantBrief(null);
     setSearchError("");
+    setContactSearchBanner(null);
     if (v === DEPARTMENT_NOT_SURE) {
       setTimeout(() => {
         document.getElementById("department-finder")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -533,6 +541,7 @@ export function Dashboard({ data }: DashboardProps) {
     setSearchQueriesUsed(entry.queriesUsed ? [...entry.queriesUsed] : []);
     setSearchResolvedHost(entry.resolvedHost ?? null);
     setSearchAssistantBrief(entry.assistantBrief ?? null);
+    setContactSearchBanner(null);
     setSearchError("");
     const contact: ContactRecord = {
       id: newWebContactId(),
@@ -572,6 +581,7 @@ export function Dashboard({ data }: DashboardProps) {
       setSearchResolvedHost(null);
       setSearchAssistantBrief(null);
       setSearchError("");
+      setContactSearchBanner(null);
       const state = data.states.find((s) => s.id === stateId);
       const countyName = filteredCounties.find((c) => c.id === countyId)?.name ?? countyId;
       const newId = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `ps-${Date.now()}`;
@@ -624,14 +634,23 @@ export function Dashboard({ data }: DashboardProps) {
         setSearchResolvedHost(resolved);
         const brief = parseContactAssistantBrief(json.assistant);
         setSearchAssistantBrief(brief);
-        const emptyNote =
-          candidates.length === 0
-            ? "No public results with a verifiable email were returned for this place and department."
-            : undefined;
+        const jurisdictionNote =
+          typeof json.contactSearchNote === "string" && json.contactSearchNote.trim()
+            ? json.contactSearchNote.trim()
+            : null;
+        setContactSearchBanner(jurisdictionNote);
+
+        const defaultEmptyNote =
+          "No public departmental emails were verified for this place (or they were excluded as belonging to neighboring towns).";
+        const emptyNote = candidates.length === 0 ? jurisdictionNote ?? defaultEmptyNote : undefined;
         if (candidates.length === 0) {
-          setSearchError(
-            "No public results with a verifiable email were returned for this place and department. Try another department, a larger nearby place, or check Serper / network configuration."
-          );
+          if (jurisdictionNote) {
+            setSearchError("");
+          } else {
+            setSearchError(
+              "No public departmental emails were found after verification. Try another department or check API keys."
+            );
+          }
         }
         pushPast({
           ...entryBase,
@@ -644,6 +663,7 @@ export function Dashboard({ data }: DashboardProps) {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Search failed";
         setSearchError(msg);
+        setContactSearchBanner(null);
         setSearchQueriesUsed([]);
         setSearchResolvedHost(null);
         setSearchAssistantBrief(null);
@@ -747,6 +767,12 @@ export function Dashboard({ data }: DashboardProps) {
               {sparkleMessage && (
                 <p className="mt-2 rounded-xl border border-slate-200/60 bg-primary-fixed/80 px-4 py-2 text-sm font-medium text-brand">{sparkleMessage}</p>
               )}
+              {contactSearchBanner && !searchLoading && (
+                <div className="mt-3 rounded-2xl border border-amber-200/90 bg-amber-50/95 px-4 py-3.5 text-sm leading-relaxed text-amber-950 shadow-sm sm:px-5">
+                  <p className="text-xs font-bold uppercase tracking-wide text-amber-900/90">Nothing left after place filter</p>
+                  <p className="mt-1.5 text-[15px] text-amber-950/95">{contactSearchBanner}</p>
+                </div>
+              )}
               {searchAssistantBrief && filteredSearchResults.length > 0 && !searchLoading && (
                 <ContactGuideSummary
                   brief={searchAssistantBrief}
@@ -841,6 +867,7 @@ export function Dashboard({ data }: DashboardProps) {
                   setSearchQueriesUsed([]);
                   setSearchResolvedHost(null);
                   setSearchAssistantBrief(null);
+                  setContactSearchBanner(null);
                 }}
                 onIntentSearch={handleSparkle}
                 searchLoading={searchLoading}
@@ -1473,9 +1500,7 @@ function WebSearchResultsList({
   results: WebSearchCandidate[];
   municipality?: MunicipalityRecord;
   department?: DepartmentRecord;
-  /** Exact Serper `q` strings for this run (optional for older saved history). */
   queriesUsed?: string[];
-  /** Primary government host used for same-site crawl (optional). */
   resolvedHost?: string | null;
   onEmail: (candidate: WebSearchCandidate, selectedEmail: string) => void;
   className?: string;
@@ -1488,148 +1513,139 @@ function WebSearchResultsList({
 
   if (results.length === 0) return null;
   const useful = results.filter((r) => r.email || r.phone || r.name);
-  const rest = results.filter((r) => !r.email && !r.phone && !r.name);
+  const place = municipality?.name ?? "Selected place";
+  const dept = department?.name ?? "Department";
 
   return (
-    <div className={`${className} overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-soft`}>
-      <div className="flex flex-col gap-2 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
+    <div className={`${className} overflow-hidden rounded-2xl border border-slate-200/70 bg-gradient-to-b from-white via-slate-50/40 to-white shadow-soft ring-1 ring-slate-100/80`}>
+      <div className="border-b border-slate-200/60 px-5 py-4 sm:flex sm:items-start sm:justify-between sm:gap-4 sm:px-6 sm:py-5">
         <div className="min-w-0">
-          <h3 className="font-display text-lg font-semibold text-brand">Contacts Found</h3>
-          <p className="mt-0.5 text-sm text-slate-500">
-            {department?.name} · {municipality?.name}
-          </p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-primary/90">This place · this department</p>
+          <h3 className="font-display mt-1.5 text-xl font-bold leading-tight tracking-tight text-slate-900 sm:text-2xl">
+            {place}
+            <span className="mx-2 font-light text-slate-300">·</span>
+            <span className="font-semibold text-brand">{dept}</span>
+          </h3>
           {resolvedHost ? (
-            <p className="mt-1.5 text-xs text-slate-600">
-              Same-site pass on{" "}
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-medium text-slate-800">
-                {resolvedHost}
-              </span>{" "}
-              — department-style links on that host were fetched and ranked first.
+            <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-100/90 px-2.5 py-1 font-semibold text-emerald-950">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" aria-hidden />
+                Official site · {resolvedHost}
+              </span>
+              <span className="text-slate-500">Neighboring towns hidden</span>
             </p>
           ) : (
-            <p className="mt-1.5 text-xs text-slate-500">
-              No official host matched the place name in discovery results — showing open web matches only.
+            <p className="mt-3 text-xs leading-relaxed text-slate-600">
+              Locked to mentions of <span className="font-semibold text-slate-800">{place}</span> only (no neighboring
+              towns). If this is thin, try an incorporated place in the dropdown.
             </p>
           )}
-          {queriesUsed && queriesUsed.length > 0 ? (
-            <details className="mt-2 text-left text-xs text-slate-500">
-              <summary className="cursor-pointer font-medium text-slate-600 hover:text-slate-800">
-                Exact searches run
-              </summary>
-              <ol className="mt-2 list-decimal space-y-1.5 pl-4 font-mono text-[11px] leading-snug text-slate-600">
-                {queriesUsed.map((q, i) => (
-                  <li key={i} className="break-all">
-                    {q}
-                  </li>
-                ))}
-              </ol>
-            </details>
-          ) : null}
         </div>
-        <span className="w-fit shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-          {results.length} result{results.length !== 1 ? "s" : ""}
+        <span className="mt-3 inline-flex w-fit shrink-0 rounded-full bg-slate-900 px-3 py-1 text-xs font-bold tabular-nums text-white sm:mt-0">
+          {useful.length} contact{useful.length !== 1 ? "s" : ""}
         </span>
       </div>
 
-      <div className="divide-y divide-slate-100">
+      <div className="space-y-3 p-4 sm:p-5">
         {useful.map((result, i) => {
           const emails = uniqueEmailsFromCandidate(result);
           const picked = pickedEmailByRow[i] ?? defaultPickEmail(result, emails);
           const multi = emails.length > 1;
           const hasEmail = emails.length > 0;
+          const phones = result.allPhones?.length ? result.allPhones : result.phone ? [result.phone] : [];
+          const sourceLabel = result.sourceUrl.replace(/^https?:\/\//i, "");
 
           return (
-            <div key={i} className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-6">
-              <div className="min-w-0 flex-1">
-                {result.name && <p className="font-semibold text-slate-900">{result.name}</p>}
-                {result.title && <p className="mt-0.5 text-xs text-slate-500">{result.title}</p>}
-                {multi && (
-                  <p className="mt-2 text-xs font-medium text-slate-600">
-                    Multiple addresses — select one, click an address to compose, or use{" "}
-                    <span className="font-bold text-slate-800">Email</span> for the selected row.
-                  </p>
-                )}
-                <div className="mt-2 flex flex-col gap-1.5">
-                  {emails.map((email) => (
-                    <div key={email} className="flex items-start gap-2">
-                      {multi ? (
-                        <input
-                          type="radio"
-                          name={`contact-email-choice-${i}`}
-                          checked={picked === email}
-                          onChange={() => setPickedEmailByRow((prev) => ({ ...prev, [i]: email }))}
-                          className="focus-ring mt-2 h-4 w-4 shrink-0 cursor-pointer accent-primary"
-                          aria-label={`Select ${email}`}
-                        />
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPickedEmailByRow((prev) => ({ ...prev, [i]: email }));
-                          onEmail(result, email);
-                        }}
-                        className="focus-ring group flex min-h-[40px] flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-medium text-primary transition hover:bg-primary/5 hover:underline sm:min-h-0"
-                      >
-                        <Mail size={14} className="shrink-0 text-primary group-hover:text-primary-container" aria-hidden />
-                        <span className="min-w-0 break-all">{email}</span>
-                      </button>
+            <article
+              key={`${result.sourceUrl}-${i}`}
+              className="rounded-xl border border-slate-200/80 bg-white/95 shadow-sm ring-1 ring-black/[0.02]"
+            >
+              <div className="flex flex-col gap-4 border-l-[3px] border-l-primary px-4 py-4 sm:flex-row sm:items-stretch sm:justify-between sm:gap-6 sm:pl-5 sm:pr-4">
+                <div className="min-w-0 flex-1">
+                  {(result.name || result.title) && (
+                    <div className="space-y-0.5">
+                      {result.name ? <p className="text-base font-semibold text-slate-900">{result.name}</p> : null}
+                      {result.title ? <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{result.title}</p> : null}
                     </div>
-                  ))}
-                  {(result.allPhones ?? (result.phone ? [result.phone] : [])).map((phone) => (
-                    <div key={phone} className="flex items-center gap-2">
-                      <span className="text-xs text-slate-400">📞</span>
-                      <span className="text-sm text-slate-700">{phone}</span>
-                    </div>
-                  ))}
-                </div>
-                <a
-                  href={result.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 inline-block max-w-full truncate text-xs text-slate-400 hover:text-primary hover:underline sm:max-w-xs"
-                >
-                  {result.sourceUrl.replace(/^https?:\/\//, "").split("/")[0]}
-                </a>
-              </div>
-              <div className="flex shrink-0 flex-row items-center justify-between gap-2 sm:flex-col sm:items-end">
-                <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">
-                  {result.confidence}% match
-                </span>
-                {hasEmail && picked ? (
-                  <button
-                    type="button"
-                    onClick={() => onEmail(result, picked)}
-                    className="flex min-h-[44px] min-w-[7rem] items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white transition hover:bg-primary-container sm:min-h-0 sm:min-w-0 sm:px-3"
+                  )}
+                  <div className="mt-3 space-y-2">
+                    {emails.map((email) => (
+                      <div key={email} className="flex items-start gap-2">
+                        {multi ? (
+                          <input
+                            type="radio"
+                            name={`contact-email-choice-${i}`}
+                            checked={picked === email}
+                            onChange={() => setPickedEmailByRow((prev) => ({ ...prev, [i]: email }))}
+                            className="focus-ring mt-1.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"
+                            aria-label={`Select ${email}`}
+                          />
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPickedEmailByRow((prev) => ({ ...prev, [i]: email }));
+                            onEmail(result, email);
+                          }}
+                          className="focus-ring group min-h-[44px] flex-1 rounded-lg border border-slate-100 bg-slate-50/90 px-3 py-2.5 text-left transition hover:border-primary/25 hover:bg-primary/5 sm:min-h-0 sm:py-2"
+                        >
+                          <span className="flex items-start gap-2">
+                            <Mail size={16} className="mt-0.5 shrink-0 text-primary" aria-hidden />
+                            <span className="min-w-0 break-all font-mono text-[15px] font-medium leading-snug text-slate-900">{email}</span>
+                          </span>
+                        </button>
+                      </div>
+                    ))}
+                    {phones.map((phone) => (
+                      <div key={phone} className="flex items-center gap-2 pl-1 text-sm text-slate-700">
+                        <Phone size={15} className="shrink-0 text-slate-400" aria-hidden />
+                        <span>{phone}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <a
+                    href={result.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="focus-ring mt-3 inline-flex max-w-full items-center gap-1.5 truncate text-xs font-medium text-slate-500 transition hover:text-primary"
                   >
-                    <Mail size={13} aria-hidden />
-                    Email
-                  </button>
-                ) : null}
+                    <ExternalLink size={12} className="shrink-0 opacity-70" aria-hidden />
+                    <span className="min-w-0 truncate">{sourceLabel}</span>
+                  </a>
+                </div>
+                <div className="flex flex-row items-center justify-between gap-3 border-t border-slate-100 pt-3 sm:w-36 sm:flex-col sm:border-t-0 sm:border-l sm:border-slate-100 sm:py-2 sm:pl-5">
+                  <p className="text-[11px] font-medium text-slate-400">Fit {result.confidence}%</p>
+                  {hasEmail && picked ? (
+                    <button
+                      type="button"
+                      onClick={() => onEmail(result, picked)}
+                      className="focus-ring flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-primary/15 transition hover:bg-primary-container sm:min-h-[42px] sm:w-full sm:flex-none sm:py-3"
+                    >
+                      <Mail size={15} aria-hidden />
+                      Compose
+                    </button>
+                  ) : null}
+                </div>
               </div>
-            </div>
+            </article>
           );
         })}
-
-        {rest.length > 0 && (
-          <div className="px-4 py-4 sm:px-6">
-            <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">Additional sources</p>
-            <div className="space-y-2">
-              {rest.map((result, i) => (
-                <a
-                  key={i}
-                  href={result.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-primary hover:underline"
-                >
-                  <Search size={13} />
-                  {result.pageTitle}
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
+
+      {queriesUsed && queriesUsed.length > 0 ? (
+        <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 sm:px-6">
+          <details className="text-xs text-slate-500">
+            <summary className="cursor-pointer font-semibold text-slate-600 hover:text-slate-900">Technical · queries run</summary>
+            <ol className="mt-2 list-decimal space-y-1 pl-4 font-mono text-[11px] leading-relaxed text-slate-600">
+              {queriesUsed.map((q, idx) => (
+                <li key={idx} className="break-all">
+                  {q}
+                </li>
+              ))}
+            </ol>
+          </details>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1691,16 +1707,16 @@ function ContactGuideSummary({
   }
 
   return (
-    <section className="mt-4 overflow-hidden rounded-2xl border border-violet-200/70 bg-[linear-gradient(160deg,#f5f0ff_0%,#ffffff_46%)] shadow-soft">
-      <div className="border-b border-violet-100/80 bg-white/40 px-4 py-3.5 sm:px-6">
+    <section className="mt-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-slate-50/90 to-white shadow-soft ring-1 ring-slate-100/80">
+      <div className="border-b border-slate-200/60 bg-white/60 px-4 py-3.5 sm:px-6">
         <div className="flex items-start gap-2.5">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-800">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
             <Lightbulb size={20} aria-hidden />
           </div>
           <div className="min-w-0">
-            <h3 className="font-display text-base font-bold text-brand sm:text-lg">Who to contact first</h3>
+            <h3 className="font-display text-base font-bold text-brand sm:text-lg">Suggested order</h3>
             <p className="mt-0.5 text-xs leading-relaxed text-slate-600">
-              Suggested order from your search results (not from memory). Every address below appeared in the finder.
+              Labels only — every email below is from the filtered list for this place (not invented).
             </p>
           </div>
         </div>
@@ -2602,8 +2618,10 @@ function WebSearchResults({
         <div className="flex items-center gap-3">
           <RefreshCw size={20} className="animate-spin text-primary" />
           <div>
-            <p className="font-semibold text-slate-900">Searching the web…</p>
-            <p className="text-sm text-slate-500">Finding {department?.name} contacts in {municipality?.name}</p>
+            <p className="font-semibold text-slate-900">Looking up official contacts…</p>
+            <p className="text-sm text-slate-500">
+              {department?.name} · {municipality?.name} — neighbors excluded in results
+            </p>
           </div>
         </div>
       </div>
