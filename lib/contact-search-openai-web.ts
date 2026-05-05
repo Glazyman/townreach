@@ -101,29 +101,90 @@ function extractAssistantText(output: unknown): string {
   return chunks.join("\n\n");
 }
 
-function guessResolvedHost(urls: string[]): string | null {
-  const hosts: string[] = [];
+const STATE_FEDERAL_AGENCY_HINTS =
+  /\b(dec|dot|dmv|doj|dept|department|education|health|labor|tax|treasury|parks|police|fire|epa|fema|usda|usgs|nps|senate|assembly|governor)\b/i;
+
+function toSignificantTokens(raw: string): string[] {
+  return raw
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((x) => x.length >= 4);
+}
+
+function hostScore(host: string, municipality: string, state: string): number {
+  const h = host.toLowerCase().replace(/^www\./, "");
+  const muniTokens = toSignificantTokens(municipality);
+  const stateTokens = toSignificantTokens(state);
+  let score = 0;
+
+  if (h.endsWith(".gov")) score += 25;
+  if (/\.[a-z]{2}\.us$/i.test(h) || h.endsWith(".state.us")) score += 20;
+  if (h.endsWith(".org")) score += 5;
+
+  for (const t of muniTokens) {
+    if (h.includes(t)) score += 45;
+  }
+  if (h.includes("town") || h.includes("city") || h.includes("village") || h.includes("county")) score += 14;
+
+  // Penalize likely state/federal agency domains unless municipality token is present.
+  if (STATE_FEDERAL_AGENCY_HINTS.test(h) && !muniTokens.some((t) => h.includes(t))) score -= 50;
+
+  // Penalize plain state root domains (e.g. ny.gov) that usually route to statewide content.
+  const isPlainStateGovRoot =
+    stateTokens.some((tok) => h === `${tok}.gov`) ||
+    /^[a-z]{2}\.gov$/i.test(h);
+  if (isPlainStateGovRoot) score -= 35;
+
+  return score;
+}
+
+function guessResolvedHost(urls: string[], municipality: string, state: string): string | null {
+  const weighted = new Map<string, number>();
   for (const u of urls) {
     try {
-      hosts.push(new URL(u).hostname.toLowerCase().replace(/^www\./, ""));
+      const host = new URL(u).hostname.toLowerCase().replace(/^www\./, "");
+      const base = hostScore(host, municipality, state);
+      weighted.set(host, (weighted.get(host) ?? 0) + base + 12);
     } catch {
       /* skip */
     }
   }
-  const govHosts = hosts.filter((h) => h.endsWith(".gov") || /\.[a-z]{2}\.us$/i.test(h));
-  const pickFrom = govHosts.length > 0 ? govHosts : hosts;
-  if (pickFrom.length === 0) return null;
-  const tally = new Map<string, number>();
-  for (const h of pickFrom) tally.set(h, (tally.get(h) ?? 0) + 1);
-  let best = pickFrom[0]!;
-  let bestN = 0;
-  for (const [h, n] of tally) {
-    if (n > bestN) {
+  let best: string | null = null;
+  let bestScore = Number.NEGATIVE_INFINITY;
+  for (const [h, s] of weighted) {
+    if (s > bestScore) {
       best = h;
-      bestN = n;
+      bestScore = s;
     }
   }
-  return best;
+  if (!best) return null;
+  return bestScore >= 5 ? best : null;
+}
+
+function isSameRegistrableHost(rootHost: string, url: string): boolean {
+  try {
+    const h = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+    const r = rootHost.toLowerCase().replace(/^www\./, "");
+    return h === r || h.endsWith("." + r);
+  } catch {
+    return false;
+  }
+}
+
+function shouldKeepUrlForLocalContacts(
+  url: string,
+  municipality: string,
+  state: string,
+  resolvedHost: string | null
+): boolean {
+  if (resolvedHost) return isSameRegistrableHost(resolvedHost, url);
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+    const score = hostScore(host, municipality, state);
+    return score >= 0;
+  } catch {
+    return false;
+  }
 }
 
 function titleFromHtml(html: string): string {
@@ -190,9 +251,10 @@ export async function gatherContactsViaOpenAiWebSearch(params: {
     `Department / function: ${params.department}`,
     params.intent ? `Resident/user question: ${params.intent}` : null,
     ``,
-    `Search the official public web (.gov municipal/county/state sites strongly preferred).`,
+    `Search the official public web and prioritize the local governing municipality/county site for that place.`,
     `Find who to contact — especially shared department inboxes AND named staff emails when published.`,
     `If "${params.municipality}" is a Census place/CDP serviced by another town/village government, prioritize that jurisdiction's actual official site.`,
+    `Avoid state/federal agency pages unless they are clearly the local governing authority for the municipal department asked.`,
     `Reply with short guidance and rely on citations to official URLs (the app will scrape those pages for mailboxes).`
   ]
     .filter(Boolean)
@@ -271,18 +333,21 @@ export async function gatherContactsViaOpenAiWebSearch(params: {
     }
   });
 
-  const resolvedHost = guessResolvedHost(urls);
+  const resolvedHost = guessResolvedHost(urls, params.municipality, params.state);
 
   const organic: SerperOrganic[] = [];
   const seen = new Set<string>();
 
   await Promise.all(
-    urls.slice(0, 18).map(async (url) => {
+    urls
+      .filter((u) => shouldKeepUrlForLocalContacts(u, params.municipality, params.state, resolvedHost))
+      .slice(0, 18)
+      .map(async (url) => {
       const row = await fetchUrlToOrganic(url, assistText);
       if (!row?.link || seen.has(row.link)) return;
       seen.add(row.link);
       organic.push(row);
-    })
+      })
   );
 
   const queriesUsed = [
