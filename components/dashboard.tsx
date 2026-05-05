@@ -84,6 +84,8 @@ type PastSearchEntry = {
   municipalityName: string;
   departmentId: string;
   departmentName: string;
+  /** Serper query strings from the last successful run (optional for older saved history). */
+  queriesUsed?: string[];
   candidates: WebSearchCandidate[];
   error?: string;
   note?: string;
@@ -143,6 +145,7 @@ export function Dashboard({ data }: DashboardProps) {
   const [activePanel, setActivePanel] = useState<ActivePanel>("dashboard");
   const [sparkleMessage, setSparkleMessage] = useState("");
   const [searchResults, setSearchResults] = useState<WebSearchCandidate[]>([]);
+  const [searchQueriesUsed, setSearchQueriesUsed] = useState<string[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -398,6 +401,7 @@ export function Dashboard({ data }: DashboardProps) {
     setDepartmentId("");
     setSelectedContact(null);
     setSearchResults([]);
+    setSearchQueriesUsed([]);
     setSearchError("");
   }
   function handleCountyChange(value: string) {
@@ -406,6 +410,7 @@ export function Dashboard({ data }: DashboardProps) {
     setDepartmentId("");
     setSelectedContact(null);
     setSearchResults([]);
+    setSearchQueriesUsed([]);
     setSearchError("");
   }
   function handleMunicipalityChange(value: string) {
@@ -413,6 +418,7 @@ export function Dashboard({ data }: DashboardProps) {
     setDepartmentId("");
     setSelectedContact(null);
     setSearchResults([]);
+    setSearchQueriesUsed([]);
     setSearchError("");
   }
 
@@ -420,6 +426,7 @@ export function Dashboard({ data }: DashboardProps) {
     setDepartmentId(v);
     setSelectedContact(null);
     setSearchResults([]);
+    setSearchQueriesUsed([]);
     setSearchError("");
     if (v === DEPARTMENT_NOT_SURE) {
       setTimeout(() => {
@@ -483,6 +490,7 @@ export function Dashboard({ data }: DashboardProps) {
     setMunicipalityId(entry.municipalityId);
     setDepartmentId(entry.departmentId);
     setSearchResults(cloneWebCandidates(entry.candidates));
+    setSearchQueriesUsed(entry.queriesUsed ? [...entry.queriesUsed] : []);
     setSearchError("");
     const contact: ContactRecord = {
       id: newWebContactId(),
@@ -518,6 +526,7 @@ export function Dashboard({ data }: DashboardProps) {
     if (readyForLookup && selectedMunicipality && effectiveDepartment) {
       setSearchLoading(true);
       setSearchResults([]);
+      setSearchQueriesUsed([]);
       setSearchError("");
       const state = data.states.find((s) => s.id === stateId);
       const countyName = filteredCounties.find((c) => c.id === countyId)?.name ?? countyId;
@@ -557,7 +566,14 @@ export function Dashboard({ data }: DashboardProps) {
           throw new Error(msg);
         }
         const candidates = cloneWebCandidates((json.candidates ?? []) as WebSearchCandidate[]);
+        const queriesUsed =
+          Array.isArray(json.queriesUsed) && json.queriesUsed.every((x: unknown) => typeof x === "string")
+            ? (json.queriesUsed as string[])
+            : typeof json.query === "string"
+              ? [json.query]
+              : [];
         setSearchResults(candidates);
+        setSearchQueriesUsed(queriesUsed);
         const emptyNote =
           candidates.length === 0
             ? "No public results with a verifiable email were returned for this place and department."
@@ -567,10 +583,11 @@ export function Dashboard({ data }: DashboardProps) {
             "No public results with a verifiable email were returned for this place and department. Try another department, a larger nearby place, or check Serper / network configuration."
           );
         }
-        pushPast({ ...entryBase, candidates, note: emptyNote });
+        pushPast({ ...entryBase, candidates, note: emptyNote, queriesUsed });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Search failed";
         setSearchError(msg);
+        setSearchQueriesUsed([]);
         setPastSearches((prev) => {
           if (prev.some((e) => e.id === entryBase.id)) return prev;
           return [{ ...entryBase, candidates: [], error: msg }, ...prev].slice(0, MAX_PAST_SEARCHES);
@@ -676,6 +693,7 @@ export function Dashboard({ data }: DashboardProps) {
                   error={searchError}
                   municipality={selectedMunicipality}
                   department={effectiveDepartment}
+                  queriesUsed={searchQueriesUsed}
                   onEmail={(candidate, selectedEmail) => {
                     const dept = effectiveDepartment;
                     if (!dept || !selectedMunicipality) return;
@@ -725,7 +743,12 @@ export function Dashboard({ data }: DashboardProps) {
                 department={recommendedDepartment}
                 departmentModeNotSure={departmentId === DEPARTMENT_NOT_SURE}
                 municipality={selectedMunicipality}
-                onUseDepartment={(id) => { setDepartmentId(id); setSelectedContact(null); setSearchResults([]); }}
+                onUseDepartment={(id) => {
+                  setDepartmentId(id);
+                  setSelectedContact(null);
+                  setSearchResults([]);
+                  setSearchQueriesUsed([]);
+                }}
                 onIntentSearch={handleSparkle}
                 searchLoading={searchLoading}
               />
@@ -1331,12 +1354,15 @@ function WebSearchResultsList({
   results,
   municipality,
   department,
+  queriesUsed,
   onEmail,
   className = "mt-4"
 }: {
   results: WebSearchCandidate[];
   municipality?: MunicipalityRecord;
   department?: DepartmentRecord;
+  /** Exact Serper `q` strings for this run (optional for older saved history). */
+  queriesUsed?: string[];
   onEmail: (candidate: WebSearchCandidate, selectedEmail: string) => void;
   className?: string;
 }) {
@@ -1358,6 +1384,20 @@ function WebSearchResultsList({
           <p className="mt-0.5 text-sm text-slate-500">
             {department?.name} · {municipality?.name}
           </p>
+          {queriesUsed && queriesUsed.length > 0 ? (
+            <details className="mt-2 text-left text-xs text-slate-500">
+              <summary className="cursor-pointer font-medium text-slate-600 hover:text-slate-800">
+                Exact searches run
+              </summary>
+              <ol className="mt-2 list-decimal space-y-1.5 pl-4 font-mono text-[11px] leading-snug text-slate-600">
+                {queriesUsed.map((q, i) => (
+                  <li key={i} className="break-all">
+                    {q}
+                  </li>
+                ))}
+              </ol>
+            </details>
+          ) : null}
         </div>
         <span className="w-fit shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
           {results.length} result{results.length !== 1 ? "s" : ""}
@@ -1582,6 +1622,7 @@ function PastSearchesPanel({
                         key={s.id}
                         className="mt-0"
                         results={s.candidates}
+                        queriesUsed={s.queriesUsed}
                         municipality={{
                           id: s.municipalityId,
                           countyId: s.countyId,
@@ -2307,12 +2348,21 @@ function ComposerDrawer({
   );
 }
 
-function WebSearchResults({ loading, results, error, municipality, department, onEmail }: {
+function WebSearchResults({
+  loading,
+  results,
+  error,
+  municipality,
+  department,
+  queriesUsed,
+  onEmail
+}: {
   loading: boolean;
   results: WebSearchCandidate[];
   error: string;
   municipality?: MunicipalityRecord;
   department?: DepartmentRecord;
+  queriesUsed?: string[];
   onEmail: (candidate: WebSearchCandidate, selectedEmail: string) => void;
 }) {
   if (loading) {
@@ -2333,10 +2383,32 @@ function WebSearchResults({ loading, results, error, municipality, department, o
     return (
       <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 p-4">
         <p className="text-sm font-semibold text-red-700">{error}</p>
+        {queriesUsed && queriesUsed.length > 0 ? (
+          <details className="mt-3 rounded-lg border border-red-200/80 bg-white/80 px-3 py-2 text-left text-xs text-slate-600">
+            <summary className="cursor-pointer font-medium text-slate-700 hover:text-slate-900">
+              Exact searches run
+            </summary>
+            <ol className="mt-2 list-decimal space-y-1.5 pl-4 font-mono text-[11px] leading-snug text-slate-600">
+              {queriesUsed.map((q, i) => (
+                <li key={i} className="break-all">
+                  {q}
+                </li>
+              ))}
+            </ol>
+          </details>
+        ) : null}
       </div>
     );
   }
 
   if (results.length === 0) return null;
-  return <WebSearchResultsList results={results} municipality={municipality} department={department} onEmail={onEmail} />;
+  return (
+    <WebSearchResultsList
+      results={results}
+      municipality={municipality}
+      department={department}
+      queriesUsed={queriesUsed}
+      onEmail={onEmail}
+    />
+  );
 }

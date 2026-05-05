@@ -65,7 +65,7 @@ export async function GET(request: Request) {
       .filter((c) => c.email && isAcceptableOutreachEmail(c.email))
       .sort((a, b) => b.confidence - a.confidence);
 
-    return NextResponse.json({ candidates, query: queries[0] });
+    return NextResponse.json({ candidates, query: queries[0], queriesUsed: queries });
   } catch {
     return NextResponse.json({ error: "Search request failed" }, { status: 500 });
   }
