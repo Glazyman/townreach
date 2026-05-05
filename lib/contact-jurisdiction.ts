@@ -19,12 +19,22 @@ function apexLabel(host: string): string {
   return parts.length >= 2 ? parts[parts.length - 2]! : parts[0] ?? "";
 }
 
+function looksGovLike(host: string): boolean {
+  const h = normalizeHost(host);
+  return h.endsWith(".gov") || h.endsWith(".org") || /\.[a-z]{2}\.us$/i.test(h) || h.endsWith(".state.us");
+}
+
 /** Same registrable host (handles www.). */
 export function sameRegistrableHost(rootHost: string, pageUrl: string): boolean {
   try {
     const h = normalizeHost(new URL(pageUrl).hostname);
     const r = normalizeHost(rootHost);
-    return h === r || h.endsWith("." + r);
+    if (h === r || h.endsWith("." + r) || r.endsWith("." + h)) return true;
+
+    const hRoot = apexLabel(h);
+    const rRoot = apexLabel(r);
+    if (!hRoot || !rRoot || hRoot !== rRoot) return false;
+    return looksGovLike(h) && looksGovLike(r);
   } catch {
     return false;
   }

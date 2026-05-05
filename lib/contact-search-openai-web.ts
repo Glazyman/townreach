@@ -170,7 +170,17 @@ function isSameRegistrableHost(rootHost: string, url: string): boolean {
   try {
     const h = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
     const r = rootHost.toLowerCase().replace(/^www\./, "");
-    return h === r || h.endsWith("." + r);
+    if (h === r || h.endsWith("." + r) || r.endsWith("." + h)) return true;
+
+    const hParts = h.split(".").filter(Boolean);
+    const rParts = r.split(".").filter(Boolean);
+    const hRoot = hParts.length >= 2 ? hParts[hParts.length - 2] : hParts[0];
+    const rRoot = rParts.length >= 2 ? rParts[rParts.length - 2] : rParts[0];
+    if (!hRoot || !rRoot || hRoot !== rRoot) return false;
+
+    const govLike = (x: string) =>
+      x.endsWith(".gov") || x.endsWith(".org") || /\.[a-z]{2}\.us$/i.test(x) || x.endsWith(".state.us");
+    return govLike(h) && govLike(r);
   } catch {
     return false;
   }
