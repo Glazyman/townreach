@@ -768,9 +768,9 @@ export function Dashboard({ data }: DashboardProps) {
                 <p className="mt-2 rounded-xl border border-slate-200/60 bg-primary-fixed/80 px-4 py-2 text-sm font-medium text-brand">{sparkleMessage}</p>
               )}
               {contactSearchBanner && !searchLoading && (
-                <div className="mt-3 rounded-2xl border border-amber-200/90 bg-amber-50/95 px-4 py-3.5 text-sm leading-relaxed text-amber-950 shadow-sm sm:px-5">
+                <div className="mt-5 rounded-2xl border border-amber-200/90 bg-amber-50/95 px-6 py-5 text-sm leading-relaxed text-amber-950 shadow-sm sm:mt-6 sm:px-8 sm:py-7">
                   <p className="text-xs font-bold uppercase tracking-wide text-amber-900/90">Nothing left after place filter</p>
-                  <p className="mt-1.5 text-[15px] text-amber-950/95">{contactSearchBanner}</p>
+                  <p className="mt-3 max-w-prose text-base leading-relaxed text-amber-950/95 sm:text-[17px]">{contactSearchBanner}</p>
                 </div>
               )}
               {searchAssistantBrief && filteredSearchResults.length > 0 && !searchLoading && (
@@ -1374,10 +1374,10 @@ function FilterBar(props: {
   return (
     <section
       id={props.id}
-      className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-soft sm:p-5"
+      className="rounded-xl border border-slate-200/60 bg-white p-5 shadow-soft sm:p-7"
     >
-      <div className="flex flex-col gap-3">
-        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-3">
+      <div className="flex flex-col gap-5">
+        <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
           <FilterSelect label="State" value={props.stateId} onChange={props.onStateChange} disabled={false}>
             <option value="">Select state</option>
             {props.data.states.map((s) => (
@@ -1412,12 +1412,12 @@ function FilterBar(props: {
             ))}
           </FilterSelect>
         </div>
-        <div className="flex justify-center pt-1">
+        <div className="flex justify-center pt-2">
           <button
             type="button"
             onClick={props.onSparkle}
             disabled={props.searching || searchDisabled}
-            className="flex h-11 w-full max-w-xl items-center justify-center gap-2 rounded-xl bg-primary px-4 text-center text-white shadow-lg shadow-primary/20 transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-60 sm:h-12 sm:max-w-2xl sm:px-6"
+            className="flex h-12 w-full max-w-xl items-center justify-center gap-2 rounded-xl bg-primary px-6 text-center text-white shadow-lg shadow-primary/20 transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-60 sm:h-[3.25rem] sm:max-w-2xl sm:px-8"
           >
             {props.searching ? <RefreshCw size={17} className="animate-spin shrink-0" aria-hidden /> : <Sparkles size={17} className="shrink-0" aria-hidden />}
             <span className="text-center text-sm font-bold">{searchLabel}</span>
@@ -1425,12 +1425,12 @@ function FilterBar(props: {
         </div>
         {typeof props.onAssistantGuideChange === "function" &&
         typeof props.assistantGuideEnabled === "boolean" ? (
-          <label className="mx-auto flex max-w-xl cursor-pointer select-none items-center justify-center gap-2.5 text-center text-xs text-slate-600 sm:max-w-2xl">
+          <label className="mx-auto flex max-w-xl cursor-pointer select-none items-start gap-3 text-center text-sm leading-relaxed text-slate-600 sm:max-w-2xl sm:text-[15px]">
             <input
               type="checkbox"
               checked={props.assistantGuideEnabled}
               onChange={(e) => props.onAssistantGuideChange?.(e.target.checked)}
-              className="focus-ring h-4 w-4 shrink-0 rounded border-slate-300 accent-primary"
+              className="focus-ring mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-primary"
             />
             <span>
               <span className="font-semibold text-slate-800">Chat-style guide</span> — rank and label these search results
@@ -1495,7 +1495,7 @@ function WebSearchResultsList({
   queriesUsed,
   resolvedHost,
   onEmail,
-  className = "mt-4"
+  className = "mt-6"
 }: {
   results: WebSearchCandidate[];
   municipality?: MunicipalityRecord;
@@ -1518,35 +1518,35 @@ function WebSearchResultsList({
 
   return (
     <div className={`${className} overflow-hidden rounded-2xl border border-slate-200/70 bg-gradient-to-b from-white via-slate-50/40 to-white shadow-soft ring-1 ring-slate-100/80`}>
-      <div className="border-b border-slate-200/60 px-5 py-4 sm:flex sm:items-start sm:justify-between sm:gap-4 sm:px-6 sm:py-5">
+      <div className="border-b border-slate-200/60 px-6 py-6 sm:flex sm:items-start sm:justify-between sm:gap-6 sm:px-8 sm:py-8">
         <div className="min-w-0">
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-primary/90">This place · this department</p>
-          <h3 className="font-display mt-1.5 text-xl font-bold leading-tight tracking-tight text-slate-900 sm:text-2xl">
+          <h3 className="font-display mt-3 text-2xl font-bold leading-snug tracking-tight text-slate-900 sm:text-[1.75rem]">
             {place}
-            <span className="mx-2 font-light text-slate-300">·</span>
+            <span className="mx-2.5 font-light text-slate-300 sm:mx-3">·</span>
             <span className="font-semibold text-brand">{dept}</span>
           </h3>
           {resolvedHost ? (
-            <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-100/90 px-2.5 py-1 font-semibold text-emerald-950">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" aria-hidden />
+            <p className="mt-5 flex flex-wrap items-center gap-3 text-sm text-slate-600">
+              <span className="inline-flex items-center gap-2 rounded-lg bg-emerald-100/90 px-3 py-1.5 text-sm font-semibold text-emerald-950">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-600" aria-hidden />
                 Official site · {resolvedHost}
               </span>
               <span className="text-slate-500">Neighboring towns hidden</span>
             </p>
           ) : (
-            <p className="mt-3 text-xs leading-relaxed text-slate-600">
+            <p className="mt-5 max-w-prose text-sm leading-relaxed text-slate-600 sm:text-[15px]">
               Locked to mentions of <span className="font-semibold text-slate-800">{place}</span> only (no neighboring
               towns). If this is thin, try an incorporated place in the dropdown.
             </p>
           )}
         </div>
-        <span className="mt-3 inline-flex w-fit shrink-0 rounded-full bg-slate-900 px-3 py-1 text-xs font-bold tabular-nums text-white sm:mt-0">
+        <span className="mt-5 inline-flex w-fit shrink-0 self-start rounded-full bg-slate-900 px-4 py-1.5 text-sm font-bold tabular-nums text-white sm:mt-0">
           {useful.length} contact{useful.length !== 1 ? "s" : ""}
         </span>
       </div>
 
-      <div className="space-y-3 p-4 sm:p-5">
+      <div className="space-y-5 p-6 sm:space-y-6 sm:p-8">
         {useful.map((result, i) => {
           const emails = uniqueEmailsFromCandidate(result);
           const picked = pickedEmailByRow[i] ?? defaultPickEmail(result, emails);
@@ -1560,24 +1560,28 @@ function WebSearchResultsList({
               key={`${result.sourceUrl}-${i}`}
               className="rounded-xl border border-slate-200/80 bg-white/95 shadow-sm ring-1 ring-black/[0.02]"
             >
-              <div className="flex flex-col gap-4 border-l-[3px] border-l-primary px-4 py-4 sm:flex-row sm:items-stretch sm:justify-between sm:gap-6 sm:pl-5 sm:pr-4">
+              <div className="flex flex-col gap-6 border-l-4 border-l-primary px-5 py-6 sm:flex-row sm:items-stretch sm:justify-between sm:gap-8 sm:px-8 sm:py-8 sm:pl-8 sm:pr-6">
                 <div className="min-w-0 flex-1">
                   {(result.name || result.title) && (
-                    <div className="space-y-0.5">
-                      {result.name ? <p className="text-base font-semibold text-slate-900">{result.name}</p> : null}
-                      {result.title ? <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{result.title}</p> : null}
+                    <div className="space-y-1">
+                      {result.name ? (
+                        <p className="text-lg font-semibold leading-snug text-slate-900">{result.name}</p>
+                      ) : null}
+                      {result.title ? (
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{result.title}</p>
+                      ) : null}
                     </div>
                   )}
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-5 space-y-3 sm:space-y-3.5">
                     {emails.map((email) => (
-                      <div key={email} className="flex items-start gap-2">
+                      <div key={email} className="flex items-start gap-3">
                         {multi ? (
                           <input
                             type="radio"
                             name={`contact-email-choice-${i}`}
                             checked={picked === email}
                             onChange={() => setPickedEmailByRow((prev) => ({ ...prev, [i]: email }))}
-                            className="focus-ring mt-1.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"
+                            className="focus-ring mt-2 h-4 w-4 shrink-0 cursor-pointer accent-primary"
                             aria-label={`Select ${email}`}
                           />
                         ) : null}
@@ -1587,18 +1591,20 @@ function WebSearchResultsList({
                             setPickedEmailByRow((prev) => ({ ...prev, [i]: email }));
                             onEmail(result, email);
                           }}
-                          className="focus-ring group min-h-[44px] flex-1 rounded-lg border border-slate-100 bg-slate-50/90 px-3 py-2.5 text-left transition hover:border-primary/25 hover:bg-primary/5 sm:min-h-0 sm:py-2"
+                          className="focus-ring group min-h-[52px] flex-1 rounded-xl border border-slate-100 bg-slate-50/90 px-4 py-3.5 text-left transition hover:border-primary/25 hover:bg-primary/5 sm:min-h-0 sm:py-4"
                         >
-                          <span className="flex items-start gap-2">
-                            <Mail size={16} className="mt-0.5 shrink-0 text-primary" aria-hidden />
-                            <span className="min-w-0 break-all font-mono text-[15px] font-medium leading-snug text-slate-900">{email}</span>
+                          <span className="flex items-start gap-3">
+                            <Mail size={18} className="mt-0.5 shrink-0 text-primary" aria-hidden />
+                            <span className="min-w-0 break-all font-mono text-base font-medium leading-relaxed text-slate-900 sm:text-[17px]">
+                              {email}
+                            </span>
                           </span>
                         </button>
                       </div>
                     ))}
                     {phones.map((phone) => (
-                      <div key={phone} className="flex items-center gap-2 pl-1 text-sm text-slate-700">
-                        <Phone size={15} className="shrink-0 text-slate-400" aria-hidden />
+                      <div key={phone} className="flex items-center gap-3 pl-0.5 text-base leading-relaxed text-slate-700">
+                        <Phone size={17} className="shrink-0 text-slate-400" aria-hidden />
                         <span>{phone}</span>
                       </div>
                     ))}
@@ -1607,21 +1613,21 @@ function WebSearchResultsList({
                     href={result.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="focus-ring mt-3 inline-flex max-w-full items-center gap-1.5 truncate text-xs font-medium text-slate-500 transition hover:text-primary"
+                    className="focus-ring mt-5 inline-flex max-w-full items-center gap-2 truncate text-sm font-medium text-slate-500 transition hover:text-primary"
                   >
-                    <ExternalLink size={12} className="shrink-0 opacity-70" aria-hidden />
+                    <ExternalLink size={14} className="shrink-0 opacity-70" aria-hidden />
                     <span className="min-w-0 truncate">{sourceLabel}</span>
                   </a>
                 </div>
-                <div className="flex flex-row items-center justify-between gap-3 border-t border-slate-100 pt-3 sm:w-36 sm:flex-col sm:border-t-0 sm:border-l sm:border-slate-100 sm:py-2 sm:pl-5">
-                  <p className="text-[11px] font-medium text-slate-400">Fit {result.confidence}%</p>
+                <div className="flex flex-row items-center justify-between gap-4 border-t border-slate-100 pt-5 sm:w-44 sm:flex-col sm:items-stretch sm:justify-between sm:border-t-0 sm:border-l sm:border-slate-100 sm:py-1 sm:pl-8">
+                  <p className="text-xs font-medium text-slate-400">Fit {result.confidence}%</p>
                   {hasEmail && picked ? (
                     <button
                       type="button"
                       onClick={() => onEmail(result, picked)}
-                      className="focus-ring flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-primary/15 transition hover:bg-primary-container sm:min-h-[42px] sm:w-full sm:flex-none sm:py-3"
+                      className="focus-ring flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3.5 text-base font-bold text-white shadow-md shadow-primary/15 transition hover:bg-primary-container sm:min-h-[52px] sm:w-full sm:flex-none"
                     >
-                      <Mail size={15} aria-hidden />
+                      <Mail size={17} aria-hidden />
                       Compose
                     </button>
                   ) : null}
@@ -1633,10 +1639,12 @@ function WebSearchResultsList({
       </div>
 
       {queriesUsed && queriesUsed.length > 0 ? (
-        <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 sm:px-6">
+        <div className="border-t border-slate-100 bg-slate-50/50 px-6 py-5 sm:px-8 sm:py-6">
           <details className="text-xs text-slate-500">
-            <summary className="cursor-pointer font-semibold text-slate-600 hover:text-slate-900">Technical · queries run</summary>
-            <ol className="mt-2 list-decimal space-y-1 pl-4 font-mono text-[11px] leading-relaxed text-slate-600">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-600 hover:text-slate-900">
+              Technical · queries run
+            </summary>
+            <ol className="mt-4 list-decimal space-y-2 pl-5 font-mono text-xs leading-relaxed text-slate-600">
               {queriesUsed.map((q, idx) => (
                 <li key={idx} className="break-all">
                   {q}
@@ -1674,30 +1682,30 @@ function ContactGuideSummary({
 
     return (
       <div
-        className={`rounded-xl border px-4 py-3.5 ${
+        className={`rounded-xl border px-5 py-5 sm:px-6 sm:py-6 ${
           emphasis ? "border-primary/45 bg-white shadow-sm ring-1 ring-primary/15" : "border-slate-200/80 bg-white/90"
         }`}
       >
         <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-primary">{row.label}</p>
-        {displayName ? <p className="mt-2 text-sm font-semibold text-slate-900">{displayName}</p> : null}
-        <p className="mt-1 break-all font-mono text-[13px] font-medium text-slate-800">{row.email}</p>
+        {displayName ? <p className="mt-3 text-base font-semibold leading-snug text-slate-900">{displayName}</p> : null}
+        <p className="mt-2 break-all font-mono text-[15px] font-medium leading-relaxed text-slate-800">{row.email}</p>
         {(cand?.phone ?? row.phone)?.trim() ? (
-          <p className="mt-2 text-sm text-slate-600">{cand?.phone?.trim() ?? row.phone.trim()}</p>
+          <p className="mt-3 text-base leading-relaxed text-slate-600">{cand?.phone?.trim() ?? row.phone.trim()}</p>
         ) : null}
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-5 flex flex-wrap gap-3">
           {cand ? (
             <button
               type="button"
               onClick={() => onEmail(cand, row.email)}
-              className="focus-ring inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white transition hover:bg-primary-container"
+              className="focus-ring inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white transition hover:bg-primary-container"
             >
-              <Mail size={14} aria-hidden />
+              <Mail size={16} aria-hidden />
               Email in TownReach
             </button>
           ) : null}
           <a
             href={`mailto:${encodeURIComponent(row.email)}`}
-            className="focus-ring inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 transition hover:bg-slate-100"
+            className="focus-ring inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 transition hover:bg-slate-100"
           >
             Open mail app
           </a>
@@ -1707,26 +1715,26 @@ function ContactGuideSummary({
   }
 
   return (
-    <section className="mt-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-slate-50/90 to-white shadow-soft ring-1 ring-slate-100/80">
-      <div className="border-b border-slate-200/60 bg-white/60 px-4 py-3.5 sm:px-6">
-        <div className="flex items-start gap-2.5">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
-            <Lightbulb size={20} aria-hidden />
+    <section className="mt-6 overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-slate-50/90 to-white shadow-soft ring-1 ring-slate-100/80">
+      <div className="border-b border-slate-200/60 bg-white/60 px-6 py-5 sm:px-8 sm:py-6">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
+            <Lightbulb size={22} aria-hidden />
           </div>
           <div className="min-w-0">
-            <h3 className="font-display text-base font-bold text-brand sm:text-lg">Suggested order</h3>
-            <p className="mt-0.5 text-xs leading-relaxed text-slate-600">
+            <h3 className="font-display text-lg font-bold text-brand sm:text-xl">Suggested order</h3>
+            <p className="mt-2 max-w-prose text-sm leading-relaxed text-slate-600 sm:text-[15px]">
               Labels only — every email below is from the filtered list for this place (not invented).
             </p>
           </div>
         </div>
       </div>
-      <div className="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+      <div className="space-y-6 px-6 py-6 sm:space-y-7 sm:px-8 sm:py-8">
         {brief.startHere ? <RowCard row={brief.startHere} emphasis /> : null}
         {brief.alsoTry.length > 0 ? (
           <div>
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">Also try</p>
-            <div className="space-y-3">
+            <p className="mb-4 text-[11px] font-bold uppercase tracking-wide text-slate-500">Also try</p>
+            <div className="space-y-4 sm:space-y-5">
               {brief.alsoTry.map((row) => (
                 <RowCard key={`${row.email}-${row.label}`} row={row} />
               ))}
@@ -1734,9 +1742,9 @@ function ContactGuideSummary({
           </div>
         ) : null}
         {brief.processNote ? (
-          <div className="rounded-xl border border-slate-200/80 bg-slate-50/90 px-4 py-3">
+          <div className="rounded-xl border border-slate-200/80 bg-slate-50/90 px-5 py-5 sm:px-6 sm:py-6">
             <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">How it usually works</p>
-            <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{brief.processNote}</p>
+            <p className="mt-3 whitespace-pre-wrap text-base leading-relaxed text-slate-700">{brief.processNote}</p>
           </div>
         ) : null}
       </div>
@@ -2614,12 +2622,12 @@ function WebSearchResults({
 }) {
   if (loading) {
     return (
-      <div className="mt-4 rounded-xl border border-slate-200/60 bg-primary-fixed/50 p-6">
-        <div className="flex items-center gap-3">
-          <RefreshCw size={20} className="animate-spin text-primary" />
-          <div>
-            <p className="font-semibold text-slate-900">Looking up official contacts…</p>
-            <p className="text-sm text-slate-500">
+      <div className="mt-6 rounded-2xl border border-slate-200/60 bg-primary-fixed/50 p-8 sm:p-9">
+        <div className="flex items-start gap-5">
+          <RefreshCw size={22} className="mt-0.5 shrink-0 animate-spin text-primary" aria-hidden />
+          <div className="min-w-0">
+            <p className="text-lg font-semibold text-slate-900">Looking up official contacts…</p>
+            <p className="mt-2 max-w-prose text-base leading-relaxed text-slate-600">
               {department?.name} · {municipality?.name} — neighbors excluded in results
             </p>
           </div>
@@ -2630,20 +2638,20 @@ function WebSearchResults({
 
   if (error) {
     return (
-      <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 p-4">
-        <p className="text-sm font-semibold text-red-700">{error}</p>
+      <div className="mt-6 rounded-2xl border border-red-100 bg-red-50 p-6 sm:p-8">
+        <p className="text-base font-semibold leading-relaxed text-red-700">{error}</p>
         {resolvedHost ? (
-          <p className="mt-2 text-xs text-slate-700">
+          <p className="mt-4 text-sm leading-relaxed text-slate-700">
             Official host used:{" "}
             <span className="font-mono font-medium text-slate-900">{resolvedHost}</span>
           </p>
         ) : null}
         {queriesUsed && queriesUsed.length > 0 ? (
-          <details className="mt-3 rounded-lg border border-red-200/80 bg-white/80 px-3 py-2 text-left text-xs text-slate-600">
-            <summary className="cursor-pointer font-medium text-slate-700 hover:text-slate-900">
+          <details className="mt-5 rounded-xl border border-red-200/80 bg-white/80 px-4 py-3 text-left text-sm text-slate-600 sm:px-5 sm:py-4">
+            <summary className="cursor-pointer font-semibold text-slate-700 hover:text-slate-900">
               Exact searches run
             </summary>
-            <ol className="mt-2 list-decimal space-y-1.5 pl-4 font-mono text-[11px] leading-snug text-slate-600">
+            <ol className="mt-4 list-decimal space-y-2 pl-5 font-mono text-xs leading-relaxed text-slate-600">
               {queriesUsed.map((q, i) => (
                 <li key={i} className="break-all">
                   {q}
