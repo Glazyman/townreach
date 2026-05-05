@@ -314,6 +314,8 @@ export async function gatherContactsViaOpenAiWebSearch(params: {
   ]
     .filter(Boolean)
     .join("\n");
+  const simpleQuery = `what is the contact for someone to talk to about ${params.department.toLowerCase()} in ${params.municipality}, ${params.state}`;
+
   const data = await runResponsesWebSearch(userText);
   const output = data.output;
   let urls = collectUrlsFromOutput(output);
@@ -324,7 +326,13 @@ export async function gatherContactsViaOpenAiWebSearch(params: {
     }
   }
 
-  urls = urls.slice(0, 22);
+  // Also run a plain-language query variant to catch obvious municipal contact pages.
+  const plain = await runResponsesWebSearch(simpleQuery);
+  for (const u of collectUrlsFromOutput(plain.output)) {
+    if (!urls.includes(u)) urls.push(u);
+  }
+
+  urls = urls.slice(0, 30);
 
   /** Prefer gov / us public-sector hosts early in crawl budget. */
   urls.sort((a, b) => {
@@ -374,6 +382,7 @@ export async function gatherContactsViaOpenAiWebSearch(params: {
 
   const queriesUsed = [
     `OpenAI Responses (${data.model ?? model}) + hosted web_search`,
+    simpleQuery,
     userText.replace(/\s+/g, " ").slice(0, 600)
   ];
 

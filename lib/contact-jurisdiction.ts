@@ -14,6 +14,11 @@ function normalizeHost(hostname: string): string {
   return hostname.toLowerCase().replace(/^www\./, "");
 }
 
+function apexLabel(host: string): string {
+  const parts = normalizeHost(host).split(".").filter(Boolean);
+  return parts.length >= 2 ? parts[parts.length - 2]! : parts[0] ?? "";
+}
+
 /** Same registrable host (handles www.). */
 export function sameRegistrableHost(rootHost: string, pageUrl: string): boolean {
   try {
@@ -26,12 +31,21 @@ export function sameRegistrableHost(rootHost: string, pageUrl: string): boolean 
 }
 
 /** Require mailbox domain to align with page host (drops cross-town / neighbor scrape noise). */
-function emailDomainAlignedWithPage(email: string, pageUrl: string): boolean {
+function emailDomainAlignedWithPage(email: string, pageUrl: string, resolvedHost: string | null): boolean {
   const dom = email.split("@")[1]?.toLowerCase().trim().replace(/^www\./, "");
   if (!dom) return false;
   try {
     const pageHost = normalizeHost(new URL(pageUrl).hostname);
-    return dom === pageHost || pageHost.endsWith("." + dom);
+    if (dom === pageHost || pageHost.endsWith("." + dom) || dom.endsWith("." + pageHost)) return true;
+
+    // Municipal sites often use .org while staff mailboxes are on .gov (or vice versa): ramapo.org + ramapo.gov
+    if (resolvedHost) {
+      const pageRoot = apexLabel(pageHost);
+      const mailRoot = apexLabel(dom);
+      const resolvedRoot = apexLabel(resolvedHost);
+      if (pageRoot && pageRoot === mailRoot && pageRoot === resolvedRoot) return true;
+    }
+    return false;
   } catch {
     return false;
   }
@@ -65,7 +79,7 @@ export function filterCandidatesToJurisdiction<T extends JurisdictionCandidate>(
   _state: string,
   resolvedHost: string | null
 ): T[] {
-  let out = candidates.filter((c) => emailDomainAlignedWithPage(c.email.trim(), c.sourceUrl));
+  let out = candidates.filter((c) => emailDomainAlignedWithPage(c.email.trim(), c.sourceUrl, resolvedHost));
 
   if (resolvedHost) {
     return out.filter((c) => sameRegistrableHost(resolvedHost, c.sourceUrl));
