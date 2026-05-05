@@ -6,9 +6,7 @@ import {
   isAcceptableOutreachEmail,
   isFetchableContactUrl
 } from "@/lib/contact-email";
-import { buildContactAssistantBrief } from "@/lib/contact-assistant-openai";
 import { filterCandidatesToJurisdiction } from "@/lib/contact-jurisdiction";
-import { gatherContactsViaOpenAiWebSearch } from "@/lib/contact-search-openai-web";
 import { crawlMunicipalDepartmentPages, discoverMunicipalHost, topicFromIntent } from "@/lib/municipal-site-search";
 
 function wantsSubdivisionHints(intent: string | undefined | null): boolean {
@@ -24,32 +22,14 @@ export async function GET(request: Request) {
   const intentRaw = searchParams.get("intent")?.trim();
   const intent = intentRaw && intentRaw.length > 0 ? intentRaw : undefined;
   const topic = topicFromIntent(intent);
-  const wantAssistant =
-    searchParams.get("assistant") === "1" || searchParams.get("assistant")?.toLowerCase() === "true";
-
   if (!municipality || !state || !department) {
     return NextResponse.json({ error: "municipality, state, and department are required" }, { status: 400 });
   }
 
-  const provider = process.env.CONTACT_SEARCH_PROVIDER?.trim().toLowerCase() ?? "serper";
-  const useOpenAiWeb = provider === "openai" || provider === "openai-web";
-
-  if (useOpenAiWeb && !process.env.OPENAI_API_KEY?.trim()) {
+  if (!process.env.SERPER_API_KEY?.trim()) {
     return NextResponse.json(
       {
-        error:
-          "CONTACT_SEARCH_PROVIDER=openai requires OPENAI_API_KEY (OpenAI Responses API with web_search).",
-        candidates: [],
-        searchProvider: "openai"
-      },
-      { status: 503 }
-    );
-  }
-
-  if (!useOpenAiWeb && !process.env.SERPER_API_KEY?.trim()) {
-    return NextResponse.json(
-      {
-        error: "Contact search is not configured. Set SERPER_API_KEY in .env.local (see https://serper.dev), or use CONTACT_SEARCH_PROVIDER=openai with OPENAI_API_KEY.",
+        error: "Contact search is not configured. Set SERPER_API_KEY in .env.local (see https://serper.dev).",
         candidates: []
       },
       { status: 503 }
@@ -58,97 +38,75 @@ export async function GET(request: Request) {
 
   const queries: string[] = [];
   let resolvedHost: string | null = null;
-  let searchProvider: "serper" | "openai" = "serper";
 
   try {
+    const apiKey = process.env.SERPER_API_KEY!;
     const seen = new Set<string>();
     const organic: SerperResult[] = [];
+    const { host, discoveryQuery } = await discoverMunicipalHost(apiKey, municipality, state);
+    resolvedHost = host;
+    queries.push(discoveryQuery);
 
-    if (useOpenAiWeb) {
-      searchProvider = "openai";
-      const pack = await gatherContactsViaOpenAiWebSearch({
-        municipality,
-        state,
-        department,
-        intent
-      });
-      resolvedHost = pack.resolvedHost;
-      for (const item of pack.organic) {
-        if (item.link && !seen.has(item.link)) {
-          seen.add(item.link);
-          organic.push(item);
-        }
-      }
-      queries.push(...pack.queriesUsed);
-    } else {
-      const apiKey = process.env.SERPER_API_KEY!;
-      const { host, discoveryQuery } = await discoverMunicipalHost(apiKey, municipality, state);
-      resolvedHost = host;
-      queries.push(discoveryQuery);
+    if (host) {
+      queries.push(
+        `${department}${topic} site:${host}`,
+        `${municipality} ${department}${topic} site:${host} email`,
+        `${department}${topic} staff directory site:${host}`
+      );
+    }
 
+    if (wantsSubdivisionHints(intent)) {
       if (host) {
         queries.push(
-          `${department}${topic} site:${host}`,
-          `${municipality} ${department}${topic} site:${host} email`,
-          `${department}${topic} staff directory site:${host}`
+          `planning board subdivision email site:${host}`,
+          `("zoning board of appeals" OR ZBA) email site:${host}`,
+          `building planning zoning contact email site:${host}`
         );
       }
-
-      if (wantsSubdivisionHints(intent)) {
-        if (host) {
-          queries.push(
-            `planning board subdivision email site:${host}`,
-            `("zoning board of appeals" OR ZBA) email site:${host}`,
-            `building planning zoning contact email site:${host}`
-          );
-        }
       queries.push(
         `${municipality} ${state} planning board subdivision email`,
         `${municipality} ${state} zoning board appeals email`
       );
-      }
+    }
 
-      /** Broad non–site-scoped lookups pull unrelated nearby towns — skip when anchored to official host. */
-      if (!host) {
-        queries.push(
-          `${municipality} ${state} ${department}${topic} site:.gov staff directory email`,
-          `${municipality} ${state} ${department}${topic} contact email phone`,
-          `${municipality} ${state} ${department}${topic} site:.gov "@"`
-        );
-      }
-
-      const crawlOrganic = host ? await crawlMunicipalDepartmentPages(host, department, topic) : [];
-
-      const serperResults = await Promise.all(
-        queries.slice(1).map((q) =>
-          fetch("https://google.serper.dev/search", {
-            method: "POST",
-            headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
-            body: JSON.stringify({ q, num: 8 })
-          }).then((r) => r.json())
-        )
+    /** Broad non–site-scoped lookups pull unrelated nearby towns — skip when anchored to official host. */
+    if (!host) {
+      queries.push(
+        `${municipality} ${state} ${department}${topic} site:.gov staff directory email`,
+        `${municipality} ${state} ${department}${topic} contact email phone`,
+        `${municipality} ${state} ${department}${topic} site:.gov "@"`
       );
+    }
 
-      for (const item of crawlOrganic) {
+    const crawlOrganic = host ? await crawlMunicipalDepartmentPages(host, department, topic) : [];
+    const serperResults = await Promise.all(
+      queries.slice(1).map((q) =>
+        fetch("https://google.serper.dev/search", {
+          method: "POST",
+          headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
+          body: JSON.stringify({ q, num: 8 })
+        }).then((r) => r.json())
+      )
+    );
+
+    for (const item of crawlOrganic) {
+      if (item.link && !seen.has(item.link)) {
+        seen.add(item.link);
+        organic.push(item);
+      }
+    }
+
+    for (const result of serperResults) {
+      for (const item of result.organic ?? []) {
         if (item.link && !seen.has(item.link)) {
           seen.add(item.link);
           organic.push(item);
         }
       }
-
-      for (const result of serperResults) {
-        for (const item of result.organic ?? []) {
-          if (item.link && !seen.has(item.link)) {
-            seen.add(item.link);
-            organic.push(item);
-          }
-        }
-      }
     }
 
-    const enrichCap = searchProvider === "openai" ? 12 : undefined;
     const baseCandidates = organic.map((item) => buildCandidate(item, municipality, department, resolvedHost));
-    const enriched = await enrichWithPageEmails(baseCandidates, resolvedHost, enrichCap);
+    const enriched = await enrichWithPageEmails(baseCandidates, resolvedHost);
 
     const ranked = enriched
       .filter((c) => c.email && isAcceptableOutreachEmail(c.email))
@@ -163,23 +121,11 @@ export async function GET(request: Request) {
         : `Nearby towns were excluded — links had to tie clearly to "${municipality}". Nothing survived that filter; try different wording or a department closer to clerks/permitting first.`;
     }
 
-    let assistant: Awaited<ReturnType<typeof buildContactAssistantBrief>> = null;
-    if (wantAssistant && candidates.length > 0) {
-      assistant = await buildContactAssistantBrief(candidates, {
-        municipality,
-        state,
-        department,
-        intent
-      });
-    }
-
     return NextResponse.json({
       candidates,
       query: queries[queries.length > 1 ? 1 : 0] ?? queries[0],
       queriesUsed: queries,
       resolvedHost,
-      assistant,
-      searchProvider,
       contactSearchNote
     });
   } catch {

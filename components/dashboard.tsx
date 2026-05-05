@@ -76,30 +76,6 @@ type WebSearchCandidate = {
   confidence: number;
 };
 
-function parseContactAssistantBrief(raw: unknown): ContactAssistantBrief | null {
-  if (!raw || typeof raw !== "object") return null;
-  const o = raw as Record<string, unknown>;
-  const processNote = typeof o.processNote === "string" ? o.processNote.trim() : "";
-  function row(x: unknown): ContactGuideRow | null {
-    if (!x || typeof x !== "object") return null;
-    const r = x as Record<string, unknown>;
-    if (typeof r.index !== "number" || typeof r.label !== "string" || typeof r.email !== "string") return null;
-    return {
-      index: r.index,
-      label: r.label.trim(),
-      name: typeof r.name === "string" ? r.name.trim() : "",
-      email: r.email.trim(),
-      phone: typeof r.phone === "string" ? r.phone.trim() : ""
-    };
-  }
-  const startHere = row(o.startHere);
-  const alsoTry: ContactGuideRow[] = Array.isArray(o.alsoTry)
-    ? (o.alsoTry.map(row).filter(Boolean) as ContactGuideRow[])
-    : [];
-  if (!startHere && alsoTry.length === 0 && !processNote) return null;
-  return { startHere, alsoTry, processNote };
-}
-
 type PastSearchEntry = {
   id: string;
   at: string;
@@ -179,7 +155,6 @@ export function Dashboard({ data }: DashboardProps) {
   const [searchQueriesUsed, setSearchQueriesUsed] = useState<string[]>([]);
   const [searchResolvedHost, setSearchResolvedHost] = useState<string | null>(null);
   const [searchAssistantBrief, setSearchAssistantBrief] = useState<ContactAssistantBrief | null>(null);
-  const [assistantGuideEnabled, setAssistantGuideEnabled] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
   /** When filtering drops all neighbors but nothing remains (API `contactSearchNote`). */
@@ -612,7 +587,6 @@ export function Dashboard({ data }: DashboardProps) {
         });
         const intentTrim = intentQuery.trim();
         if (intentTrim) params.set("intent", intentTrim);
-        if (assistantGuideEnabled) params.set("assistant", "1");
         const res = await fetch(`/api/contacts/search?${params}`);
         const json = await res.json();
         if (!res.ok) {
@@ -632,8 +606,7 @@ export function Dashboard({ data }: DashboardProps) {
         const resolved =
           typeof json.resolvedHost === "string" && json.resolvedHost.trim() ? json.resolvedHost.trim() : null;
         setSearchResolvedHost(resolved);
-        const brief = parseContactAssistantBrief(json.assistant);
-        setSearchAssistantBrief(brief);
+        setSearchAssistantBrief(null);
         const jurisdictionNote =
           typeof json.contactSearchNote === "string" && json.contactSearchNote.trim()
             ? json.contactSearchNote.trim()
@@ -658,7 +631,7 @@ export function Dashboard({ data }: DashboardProps) {
           note: emptyNote,
           queriesUsed,
           resolvedHost: resolved,
-          assistantBrief: brief
+          assistantBrief: null
         });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Search failed";
@@ -758,8 +731,6 @@ export function Dashboard({ data }: DashboardProps) {
                 onSparkle={handleSparkle}
                 searching={searchLoading}
                 searchDisabled={!readyForLookup}
-                assistantGuideEnabled={assistantGuideEnabled}
-                onAssistantGuideChange={setAssistantGuideEnabled}
               />
               {geographyError && (
                 <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">{geographyError}</p>
@@ -1363,8 +1334,6 @@ function FilterBar(props: {
   onSparkle: () => void;
   searching: boolean;
   searchDisabled?: boolean;
-  assistantGuideEnabled?: boolean;
-  onAssistantGuideChange?: (enabled: boolean) => void;
 }) {
   const countyDisabled = !props.stateId || props.countiesLoading;
   const townDisabled = !props.countyId || props.placesLoading;
@@ -1423,22 +1392,6 @@ function FilterBar(props: {
             <span className="text-center text-sm font-bold">{searchLabel}</span>
           </button>
         </div>
-        {typeof props.onAssistantGuideChange === "function" &&
-        typeof props.assistantGuideEnabled === "boolean" ? (
-          <label className="mx-auto flex max-w-xl cursor-pointer select-none items-start gap-3 text-center text-sm leading-relaxed text-slate-600 sm:max-w-2xl sm:text-[15px]">
-            <input
-              type="checkbox"
-              checked={props.assistantGuideEnabled}
-              onChange={(e) => props.onAssistantGuideChange?.(e.target.checked)}
-              className="focus-ring mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-primary"
-            />
-            <span>
-              <span className="font-semibold text-slate-800">Chat-style guide</span> — rank and label these search results
-              with OpenAI (uses <code className="rounded bg-slate-100 px-1 font-mono text-[10px]">OPENAI_API_KEY</code>;
-              never invents emails).
-            </span>
-          </label>
-        ) : null}
       </div>
     </section>
   );
