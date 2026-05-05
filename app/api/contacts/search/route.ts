@@ -6,15 +6,24 @@ import {
   isAcceptableOutreachEmail,
   isFetchableContactUrl
 } from "@/lib/contact-email";
+import { buildContactAssistantBrief } from "@/lib/contact-assistant-openai";
 import { crawlMunicipalDepartmentPages, discoverMunicipalHost, topicFromIntent } from "@/lib/municipal-site-search";
+
+function wantsSubdivisionHints(intent: string | undefined | null): boolean {
+  if (!intent?.trim()) return false;
+  return /\bsubdiv|sub-?div|lot\s*split|boundary|plat|parcel\s*split|rezon|variance/i.test(intent);
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const municipality = searchParams.get("municipality")?.trim();
   const state = searchParams.get("state")?.trim();
   const department = searchParams.get("department")?.trim();
-  const intent = searchParams.get("intent")?.trim();
+  const intentRaw = searchParams.get("intent")?.trim();
+  const intent = intentRaw && intentRaw.length > 0 ? intentRaw : undefined;
   const topic = topicFromIntent(intent);
+  const wantAssistant =
+    searchParams.get("assistant") === "1" || searchParams.get("assistant")?.toLowerCase() === "true";
 
   if (!municipality || !state || !department) {
     return NextResponse.json({ error: "municipality, state, and department are required" }, { status: 400 });
@@ -44,6 +53,20 @@ export async function GET(request: Request) {
         `${department}${topic} site:${host}`,
         `${municipality} ${department}${topic} site:${host} email`,
         `${department}${topic} staff directory site:${host}`
+      );
+    }
+
+    if (wantsSubdivisionHints(intent)) {
+      if (host) {
+        queries.push(
+          `planning board subdivision email site:${host}`,
+          `("zoning board of appeals" OR ZBA) email site:${host}`,
+          `building planning zoning contact email site:${host}`
+        );
+      }
+      queries.push(
+        `${municipality} ${state} planning board subdivision email`,
+        `${municipality} ${state} zoning board appeals email`
       );
     }
 
@@ -91,11 +114,22 @@ export async function GET(request: Request) {
       .filter((c) => c.email && isAcceptableOutreachEmail(c.email))
       .sort((a, b) => b.confidence - a.confidence);
 
+    let assistant: Awaited<ReturnType<typeof buildContactAssistantBrief>> = null;
+    if (wantAssistant && candidates.length > 0) {
+      assistant = await buildContactAssistantBrief(candidates, {
+        municipality,
+        state,
+        department,
+        intent
+      });
+    }
+
     return NextResponse.json({
       candidates,
       query: queries[queries.length > 1 ? 1 : 0] ?? queries[0],
       queriesUsed: queries,
-      resolvedHost
+      resolvedHost,
+      assistant
     });
   } catch {
     return NextResponse.json({ error: "Search request failed" }, { status: 500 });

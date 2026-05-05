@@ -32,6 +32,7 @@ const CoverageMap = dynamic(
   () => import("@/components/coverage-map").then((m) => m.CoverageMap),
   { ssr: false }
 );
+import type { ContactAssistantBrief, ContactGuideRow } from "@/lib/contact-assistant-openai";
 import { greetingFirstName, polishSalutationSpacing } from "@/lib/contact-greeting";
 import { tokenReplace } from "@/lib/data";
 import { inferBestDepartment, neutralSearchDepartment } from "@/lib/intent-department";
@@ -73,6 +74,30 @@ type WebSearchCandidate = {
   confidence: number;
 };
 
+function parseContactAssistantBrief(raw: unknown): ContactAssistantBrief | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const processNote = typeof o.processNote === "string" ? o.processNote.trim() : "";
+  function row(x: unknown): ContactGuideRow | null {
+    if (!x || typeof x !== "object") return null;
+    const r = x as Record<string, unknown>;
+    if (typeof r.index !== "number" || typeof r.label !== "string" || typeof r.email !== "string") return null;
+    return {
+      index: r.index,
+      label: r.label.trim(),
+      name: typeof r.name === "string" ? r.name.trim() : "",
+      email: r.email.trim(),
+      phone: typeof r.phone === "string" ? r.phone.trim() : ""
+    };
+  }
+  const startHere = row(o.startHere);
+  const alsoTry: ContactGuideRow[] = Array.isArray(o.alsoTry)
+    ? (o.alsoTry.map(row).filter(Boolean) as ContactGuideRow[])
+    : [];
+  if (!startHere && alsoTry.length === 0 && !processNote) return null;
+  return { startHere, alsoTry, processNote };
+}
+
 type PastSearchEntry = {
   id: string;
   at: string;
@@ -88,6 +113,8 @@ type PastSearchEntry = {
   queriesUsed?: string[];
   /** Host we crawled for department pages (optional). */
   resolvedHost?: string | null;
+  /** OpenAI-guided ordering/labels when enabled (optional). */
+  assistantBrief?: ContactAssistantBrief | null;
   candidates: WebSearchCandidate[];
   error?: string;
   note?: string;
@@ -149,6 +176,8 @@ export function Dashboard({ data }: DashboardProps) {
   const [searchResults, setSearchResults] = useState<WebSearchCandidate[]>([]);
   const [searchQueriesUsed, setSearchQueriesUsed] = useState<string[]>([]);
   const [searchResolvedHost, setSearchResolvedHost] = useState<string | null>(null);
+  const [searchAssistantBrief, setSearchAssistantBrief] = useState<ContactAssistantBrief | null>(null);
+  const [assistantGuideEnabled, setAssistantGuideEnabled] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -406,6 +435,7 @@ export function Dashboard({ data }: DashboardProps) {
     setSearchResults([]);
     setSearchQueriesUsed([]);
     setSearchResolvedHost(null);
+    setSearchAssistantBrief(null);
     setSearchError("");
   }
   function handleCountyChange(value: string) {
@@ -416,6 +446,7 @@ export function Dashboard({ data }: DashboardProps) {
     setSearchResults([]);
     setSearchQueriesUsed([]);
     setSearchResolvedHost(null);
+    setSearchAssistantBrief(null);
     setSearchError("");
   }
   function handleMunicipalityChange(value: string) {
@@ -425,6 +456,7 @@ export function Dashboard({ data }: DashboardProps) {
     setSearchResults([]);
     setSearchQueriesUsed([]);
     setSearchResolvedHost(null);
+    setSearchAssistantBrief(null);
     setSearchError("");
   }
 
@@ -434,6 +466,7 @@ export function Dashboard({ data }: DashboardProps) {
     setSearchResults([]);
     setSearchQueriesUsed([]);
     setSearchResolvedHost(null);
+    setSearchAssistantBrief(null);
     setSearchError("");
     if (v === DEPARTMENT_NOT_SURE) {
       setTimeout(() => {
@@ -499,6 +532,7 @@ export function Dashboard({ data }: DashboardProps) {
     setSearchResults(cloneWebCandidates(entry.candidates));
     setSearchQueriesUsed(entry.queriesUsed ? [...entry.queriesUsed] : []);
     setSearchResolvedHost(entry.resolvedHost ?? null);
+    setSearchAssistantBrief(entry.assistantBrief ?? null);
     setSearchError("");
     const contact: ContactRecord = {
       id: newWebContactId(),
@@ -536,6 +570,7 @@ export function Dashboard({ data }: DashboardProps) {
       setSearchResults([]);
       setSearchQueriesUsed([]);
       setSearchResolvedHost(null);
+      setSearchAssistantBrief(null);
       setSearchError("");
       const state = data.states.find((s) => s.id === stateId);
       const countyName = filteredCounties.find((c) => c.id === countyId)?.name ?? countyId;
@@ -567,6 +602,7 @@ export function Dashboard({ data }: DashboardProps) {
         });
         const intentTrim = intentQuery.trim();
         if (intentTrim) params.set("intent", intentTrim);
+        if (assistantGuideEnabled) params.set("assistant", "1");
         const res = await fetch(`/api/contacts/search?${params}`);
         const json = await res.json();
         if (!res.ok) {
@@ -586,6 +622,8 @@ export function Dashboard({ data }: DashboardProps) {
         const resolved =
           typeof json.resolvedHost === "string" && json.resolvedHost.trim() ? json.resolvedHost.trim() : null;
         setSearchResolvedHost(resolved);
+        const brief = parseContactAssistantBrief(json.assistant);
+        setSearchAssistantBrief(brief);
         const emptyNote =
           candidates.length === 0
             ? "No public results with a verifiable email were returned for this place and department."
@@ -595,12 +633,20 @@ export function Dashboard({ data }: DashboardProps) {
             "No public results with a verifiable email were returned for this place and department. Try another department, a larger nearby place, or check Serper / network configuration."
           );
         }
-        pushPast({ ...entryBase, candidates, note: emptyNote, queriesUsed, resolvedHost: resolved });
+        pushPast({
+          ...entryBase,
+          candidates,
+          note: emptyNote,
+          queriesUsed,
+          resolvedHost: resolved,
+          assistantBrief: brief
+        });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Search failed";
         setSearchError(msg);
         setSearchQueriesUsed([]);
         setSearchResolvedHost(null);
+        setSearchAssistantBrief(null);
         setPastSearches((prev) => {
           if (prev.some((e) => e.id === entryBase.id)) return prev;
           return [{ ...entryBase, candidates: [], error: msg }, ...prev].slice(0, MAX_PAST_SEARCHES);
@@ -692,12 +738,43 @@ export function Dashboard({ data }: DashboardProps) {
                 onSparkle={handleSparkle}
                 searching={searchLoading}
                 searchDisabled={!readyForLookup}
+                assistantGuideEnabled={assistantGuideEnabled}
+                onAssistantGuideChange={setAssistantGuideEnabled}
               />
               {geographyError && (
                 <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">{geographyError}</p>
               )}
               {sparkleMessage && (
                 <p className="mt-2 rounded-xl border border-slate-200/60 bg-primary-fixed/80 px-4 py-2 text-sm font-medium text-brand">{sparkleMessage}</p>
+              )}
+              {searchAssistantBrief && filteredSearchResults.length > 0 && !searchLoading && (
+                <ContactGuideSummary
+                  brief={searchAssistantBrief}
+                  results={filteredSearchResults}
+                  onEmail={(candidate, selectedEmail) => {
+                    const dept = effectiveDepartment;
+                    if (!dept || !selectedMunicipality) return;
+                    const contact: ContactRecord = {
+                      id: newWebContactId(),
+                      municipalityId: municipalityId,
+                      departmentId: dept.id,
+                      name: greetingFirstName({
+                        name: candidate.name,
+                        pageTitle: candidate.pageTitle,
+                        snippet: candidate.snippet,
+                        email: selectedEmail
+                      }),
+                      title: candidate.title,
+                      email: selectedEmail,
+                      phone: candidate.phone,
+                      sourceUrl: candidate.sourceUrl,
+                      confidence: candidate.confidence,
+                      verified: false,
+                      lastChecked: new Date().toISOString().split("T")[0]
+                    };
+                    openComposer(contact, selectedMunicipality);
+                  }}
+                />
               )}
               {(searchLoading || filteredSearchResults.length > 0 || searchError) && (
                 <WebSearchResults
@@ -763,6 +840,7 @@ export function Dashboard({ data }: DashboardProps) {
                   setSearchResults([]);
                   setSearchQueriesUsed([]);
                   setSearchResolvedHost(null);
+                  setSearchAssistantBrief(null);
                 }}
                 onIntentSearch={handleSparkle}
                 searchLoading={searchLoading}
@@ -1258,6 +1336,8 @@ function FilterBar(props: {
   onSparkle: () => void;
   searching: boolean;
   searchDisabled?: boolean;
+  assistantGuideEnabled?: boolean;
+  onAssistantGuideChange?: (enabled: boolean) => void;
 }) {
   const countyDisabled = !props.stateId || props.countiesLoading;
   const townDisabled = !props.countyId || props.placesLoading;
@@ -1316,6 +1396,22 @@ function FilterBar(props: {
             <span className="text-center text-sm font-bold">{searchLabel}</span>
           </button>
         </div>
+        {typeof props.onAssistantGuideChange === "function" &&
+        typeof props.assistantGuideEnabled === "boolean" ? (
+          <label className="mx-auto flex max-w-xl cursor-pointer select-none items-center justify-center gap-2.5 text-center text-xs text-slate-600 sm:max-w-2xl">
+            <input
+              type="checkbox"
+              checked={props.assistantGuideEnabled}
+              onChange={(e) => props.onAssistantGuideChange?.(e.target.checked)}
+              className="focus-ring h-4 w-4 shrink-0 rounded border-slate-300 accent-primary"
+            />
+            <span>
+              <span className="font-semibold text-slate-800">Chat-style guide</span> — rank and label these search results
+              with OpenAI (uses <code className="rounded bg-slate-100 px-1 font-mono text-[10px]">OPENAI_API_KEY</code>;
+              never invents emails).
+            </span>
+          </label>
+        ) : null}
       </div>
     </section>
   );
@@ -1538,6 +1634,100 @@ function WebSearchResultsList({
   );
 }
 
+function ContactGuideSummary({
+  brief,
+  results,
+  onEmail
+}: {
+  brief: ContactAssistantBrief;
+  results: WebSearchCandidate[];
+  onEmail: (candidate: WebSearchCandidate, email: string) => void;
+}) {
+  function resolveCandidate(row: ContactGuideRow): WebSearchCandidate | null {
+    const em = row.email.toLowerCase().trim();
+    return (
+      results.find((r) => r.email.toLowerCase().trim() === em) ??
+      results.find((r) => r.allEmails?.some((x) => x.toLowerCase().trim() === em)) ??
+      null
+    );
+  }
+
+  function RowCard({ row, emphasis }: { row: ContactGuideRow; emphasis?: boolean }) {
+    const cand = resolveCandidate(row);
+    const displayName = (cand?.name ?? row.name).trim();
+
+    return (
+      <div
+        className={`rounded-xl border px-4 py-3.5 ${
+          emphasis ? "border-primary/45 bg-white shadow-sm ring-1 ring-primary/15" : "border-slate-200/80 bg-white/90"
+        }`}
+      >
+        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-primary">{row.label}</p>
+        {displayName ? <p className="mt-2 text-sm font-semibold text-slate-900">{displayName}</p> : null}
+        <p className="mt-1 break-all font-mono text-[13px] font-medium text-slate-800">{row.email}</p>
+        {(cand?.phone ?? row.phone)?.trim() ? (
+          <p className="mt-2 text-sm text-slate-600">{cand?.phone?.trim() ?? row.phone.trim()}</p>
+        ) : null}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {cand ? (
+            <button
+              type="button"
+              onClick={() => onEmail(cand, row.email)}
+              className="focus-ring inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white transition hover:bg-primary-container"
+            >
+              <Mail size={14} aria-hidden />
+              Email in TownReach
+            </button>
+          ) : null}
+          <a
+            href={`mailto:${encodeURIComponent(row.email)}`}
+            className="focus-ring inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 transition hover:bg-slate-100"
+          >
+            Open mail app
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <section className="mt-4 overflow-hidden rounded-2xl border border-violet-200/70 bg-[linear-gradient(160deg,#f5f0ff_0%,#ffffff_46%)] shadow-soft">
+      <div className="border-b border-violet-100/80 bg-white/40 px-4 py-3.5 sm:px-6">
+        <div className="flex items-start gap-2.5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-800">
+            <Lightbulb size={20} aria-hidden />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-display text-base font-bold text-brand sm:text-lg">Who to contact first</h3>
+            <p className="mt-0.5 text-xs leading-relaxed text-slate-600">
+              Suggested order from your search results (not from memory). Every address below appeared in the finder.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+        {brief.startHere ? <RowCard row={brief.startHere} emphasis /> : null}
+        {brief.alsoTry.length > 0 ? (
+          <div>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">Also try</p>
+            <div className="space-y-3">
+              {brief.alsoTry.map((row) => (
+                <RowCard key={`${row.email}-${row.label}`} row={row} />
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {brief.processNote ? (
+          <div className="rounded-xl border border-slate-200/80 bg-slate-50/90 px-4 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">How it usually works</p>
+            <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{brief.processNote}</p>
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 function PastSearchesPanel({
   searches,
   variant = "compact",
@@ -1647,6 +1837,13 @@ function PastSearchesPanel({
                     )}
                     {s.note && !s.error && (
                       <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">{s.note}</p>
+                    )}
+                    {s.assistantBrief && s.candidates.length > 0 && (
+                      <ContactGuideSummary
+                        brief={s.assistantBrief}
+                        results={s.candidates}
+                        onEmail={(c, sel) => onEmailFromHistory?.(c, s, sel)}
+                      />
                     )}
                     {s.candidates.length > 0 && (
                       <WebSearchResultsList
