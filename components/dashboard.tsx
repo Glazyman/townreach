@@ -86,6 +86,8 @@ type PastSearchEntry = {
   departmentName: string;
   /** Serper query strings from the last successful run (optional for older saved history). */
   queriesUsed?: string[];
+  /** Host we crawled for department pages (optional). */
+  resolvedHost?: string | null;
   candidates: WebSearchCandidate[];
   error?: string;
   note?: string;
@@ -146,6 +148,7 @@ export function Dashboard({ data }: DashboardProps) {
   const [sparkleMessage, setSparkleMessage] = useState("");
   const [searchResults, setSearchResults] = useState<WebSearchCandidate[]>([]);
   const [searchQueriesUsed, setSearchQueriesUsed] = useState<string[]>([]);
+  const [searchResolvedHost, setSearchResolvedHost] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -402,6 +405,7 @@ export function Dashboard({ data }: DashboardProps) {
     setSelectedContact(null);
     setSearchResults([]);
     setSearchQueriesUsed([]);
+    setSearchResolvedHost(null);
     setSearchError("");
   }
   function handleCountyChange(value: string) {
@@ -411,6 +415,7 @@ export function Dashboard({ data }: DashboardProps) {
     setSelectedContact(null);
     setSearchResults([]);
     setSearchQueriesUsed([]);
+    setSearchResolvedHost(null);
     setSearchError("");
   }
   function handleMunicipalityChange(value: string) {
@@ -419,6 +424,7 @@ export function Dashboard({ data }: DashboardProps) {
     setSelectedContact(null);
     setSearchResults([]);
     setSearchQueriesUsed([]);
+    setSearchResolvedHost(null);
     setSearchError("");
   }
 
@@ -427,6 +433,7 @@ export function Dashboard({ data }: DashboardProps) {
     setSelectedContact(null);
     setSearchResults([]);
     setSearchQueriesUsed([]);
+    setSearchResolvedHost(null);
     setSearchError("");
     if (v === DEPARTMENT_NOT_SURE) {
       setTimeout(() => {
@@ -491,6 +498,7 @@ export function Dashboard({ data }: DashboardProps) {
     setDepartmentId(entry.departmentId);
     setSearchResults(cloneWebCandidates(entry.candidates));
     setSearchQueriesUsed(entry.queriesUsed ? [...entry.queriesUsed] : []);
+    setSearchResolvedHost(entry.resolvedHost ?? null);
     setSearchError("");
     const contact: ContactRecord = {
       id: newWebContactId(),
@@ -527,6 +535,7 @@ export function Dashboard({ data }: DashboardProps) {
       setSearchLoading(true);
       setSearchResults([]);
       setSearchQueriesUsed([]);
+      setSearchResolvedHost(null);
       setSearchError("");
       const state = data.states.find((s) => s.id === stateId);
       const countyName = filteredCounties.find((c) => c.id === countyId)?.name ?? countyId;
@@ -574,6 +583,9 @@ export function Dashboard({ data }: DashboardProps) {
               : [];
         setSearchResults(candidates);
         setSearchQueriesUsed(queriesUsed);
+        const resolved =
+          typeof json.resolvedHost === "string" && json.resolvedHost.trim() ? json.resolvedHost.trim() : null;
+        setSearchResolvedHost(resolved);
         const emptyNote =
           candidates.length === 0
             ? "No public results with a verifiable email were returned for this place and department."
@@ -583,11 +595,12 @@ export function Dashboard({ data }: DashboardProps) {
             "No public results with a verifiable email were returned for this place and department. Try another department, a larger nearby place, or check Serper / network configuration."
           );
         }
-        pushPast({ ...entryBase, candidates, note: emptyNote, queriesUsed });
+        pushPast({ ...entryBase, candidates, note: emptyNote, queriesUsed, resolvedHost: resolved });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Search failed";
         setSearchError(msg);
         setSearchQueriesUsed([]);
+        setSearchResolvedHost(null);
         setPastSearches((prev) => {
           if (prev.some((e) => e.id === entryBase.id)) return prev;
           return [{ ...entryBase, candidates: [], error: msg }, ...prev].slice(0, MAX_PAST_SEARCHES);
@@ -694,6 +707,7 @@ export function Dashboard({ data }: DashboardProps) {
                   municipality={selectedMunicipality}
                   department={effectiveDepartment}
                   queriesUsed={searchQueriesUsed}
+                  resolvedHost={searchResolvedHost}
                   onEmail={(candidate, selectedEmail) => {
                     const dept = effectiveDepartment;
                     if (!dept || !selectedMunicipality) return;
@@ -748,6 +762,7 @@ export function Dashboard({ data }: DashboardProps) {
                   setSelectedContact(null);
                   setSearchResults([]);
                   setSearchQueriesUsed([]);
+                  setSearchResolvedHost(null);
                 }}
                 onIntentSearch={handleSparkle}
                 searchLoading={searchLoading}
@@ -1355,6 +1370,7 @@ function WebSearchResultsList({
   municipality,
   department,
   queriesUsed,
+  resolvedHost,
   onEmail,
   className = "mt-4"
 }: {
@@ -1363,6 +1379,8 @@ function WebSearchResultsList({
   department?: DepartmentRecord;
   /** Exact Serper `q` strings for this run (optional for older saved history). */
   queriesUsed?: string[];
+  /** Primary government host used for same-site crawl (optional). */
+  resolvedHost?: string | null;
   onEmail: (candidate: WebSearchCandidate, selectedEmail: string) => void;
   className?: string;
 }) {
@@ -1384,6 +1402,19 @@ function WebSearchResultsList({
           <p className="mt-0.5 text-sm text-slate-500">
             {department?.name} · {municipality?.name}
           </p>
+          {resolvedHost ? (
+            <p className="mt-1.5 text-xs text-slate-600">
+              Same-site pass on{" "}
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-medium text-slate-800">
+                {resolvedHost}
+              </span>{" "}
+              — department-style links on that host were fetched and ranked first.
+            </p>
+          ) : (
+            <p className="mt-1.5 text-xs text-slate-500">
+              No official host matched the place name in discovery results — showing open web matches only.
+            </p>
+          )}
           {queriesUsed && queriesUsed.length > 0 ? (
             <details className="mt-2 text-left text-xs text-slate-500">
               <summary className="cursor-pointer font-medium text-slate-600 hover:text-slate-800">
@@ -1623,6 +1654,7 @@ function PastSearchesPanel({
                         className="mt-0"
                         results={s.candidates}
                         queriesUsed={s.queriesUsed}
+                        resolvedHost={s.resolvedHost ?? null}
                         municipality={{
                           id: s.municipalityId,
                           countyId: s.countyId,
@@ -2355,6 +2387,7 @@ function WebSearchResults({
   municipality,
   department,
   queriesUsed,
+  resolvedHost,
   onEmail
 }: {
   loading: boolean;
@@ -2363,6 +2396,7 @@ function WebSearchResults({
   municipality?: MunicipalityRecord;
   department?: DepartmentRecord;
   queriesUsed?: string[];
+  resolvedHost?: string | null;
   onEmail: (candidate: WebSearchCandidate, selectedEmail: string) => void;
 }) {
   if (loading) {
@@ -2383,6 +2417,12 @@ function WebSearchResults({
     return (
       <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 p-4">
         <p className="text-sm font-semibold text-red-700">{error}</p>
+        {resolvedHost ? (
+          <p className="mt-2 text-xs text-slate-700">
+            Official host used:{" "}
+            <span className="font-mono font-medium text-slate-900">{resolvedHost}</span>
+          </p>
+        ) : null}
         {queriesUsed && queriesUsed.length > 0 ? (
           <details className="mt-3 rounded-lg border border-red-200/80 bg-white/80 px-3 py-2 text-left text-xs text-slate-600">
             <summary className="cursor-pointer font-medium text-slate-700 hover:text-slate-900">
@@ -2408,6 +2448,7 @@ function WebSearchResults({
       municipality={municipality}
       department={department}
       queriesUsed={queriesUsed}
+      resolvedHost={resolvedHost}
       onEmail={onEmail}
     />
   );

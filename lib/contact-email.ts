@@ -19,6 +19,21 @@ export function isAllowedContactPageUrl(urlStr: string): boolean {
   }
 }
 
+/** Allow HTML fetch for .gov *or* same registrable host as resolved municipal site (e.g. ramapo.gov). */
+export function isFetchableContactUrl(urlStr: string, municipalHost: string | null): boolean {
+  if (isAllowedContactPageUrl(urlStr)) return true;
+  if (!municipalHost) return false;
+  try {
+    const u = new URL(urlStr);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+    const h = u.hostname.toLowerCase().replace(/^www\./, "");
+    const root = municipalHost.toLowerCase().replace(/^www\./, "");
+    return h === root || h.endsWith("." + root);
+  } catch {
+    return false;
+  }
+}
+
 export function isAcceptableOutreachEmail(email: string): boolean {
   const e = email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return false;

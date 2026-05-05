@@ -4,8 +4,9 @@ import {
   extractEmailsFromText,
   filterAcceptableEmails,
   isAcceptableOutreachEmail,
-  isAllowedContactPageUrl
+  isFetchableContactUrl
 } from "@/lib/contact-email";
+import { crawlMunicipalDepartmentPages, discoverMunicipalHost, topicFromIntent } from "@/lib/municipal-site-search";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
   const state = searchParams.get("state")?.trim();
   const department = searchParams.get("department")?.trim();
   const intent = searchParams.get("intent")?.trim();
-  const topic = intent ? ` ${intent}` : "";
+  const topic = topicFromIntent(intent);
 
   if (!municipality || !state || !department) {
     return NextResponse.json({ error: "municipality, state, and department are required" }, { status: 400 });
@@ -30,15 +31,32 @@ export async function GET(request: Request) {
     );
   }
 
-  const queries = [
-    `${municipality} ${state} ${department}${topic} site:.gov staff directory email`,
-    `${municipality} ${state} ${department}${topic} contact email phone`,
-    `${municipality} ${state} ${department}${topic} site:.gov "@"`
-  ];
+  const queries: string[] = [];
+  let resolvedHost: string | null = null;
 
   try {
-    const results = await Promise.all(
-      queries.map((q) =>
+    const { host, discoveryQuery } = await discoverMunicipalHost(apiKey, municipality, state);
+    resolvedHost = host;
+    queries.push(discoveryQuery);
+
+    if (host) {
+      queries.push(
+        `${department}${topic} site:${host}`,
+        `${municipality} ${department}${topic} site:${host} email`,
+        `${department}${topic} staff directory site:${host}`
+      );
+    }
+
+    queries.push(
+      `${municipality} ${state} ${department}${topic} site:.gov staff directory email`,
+      `${municipality} ${state} ${department}${topic} contact email phone`,
+      `${municipality} ${state} ${department}${topic} site:.gov "@"`
+    );
+
+    const crawlOrganic = host ? await crawlMunicipalDepartmentPages(host, department, topic) : [];
+
+    const serperResults = await Promise.all(
+      queries.slice(1).map((q) =>
         fetch("https://google.serper.dev/search", {
           method: "POST",
           headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
@@ -49,7 +67,15 @@ export async function GET(request: Request) {
 
     const seen = new Set<string>();
     const organic: SerperResult[] = [];
-    for (const result of results) {
+
+    for (const item of crawlOrganic) {
+      if (item.link && !seen.has(item.link)) {
+        seen.add(item.link);
+        organic.push(item);
+      }
+    }
+
+    for (const result of serperResults) {
       for (const item of result.organic ?? []) {
         if (item.link && !seen.has(item.link)) {
           seen.add(item.link);
@@ -58,14 +84,19 @@ export async function GET(request: Request) {
       }
     }
 
-    const baseCandidates = organic.map((item) => buildCandidate(item, municipality, department));
-    const enriched = await enrichWithPageEmails(baseCandidates);
+    const baseCandidates = organic.map((item) => buildCandidate(item, municipality, department, resolvedHost));
+    const enriched = await enrichWithPageEmails(baseCandidates, resolvedHost);
 
     const candidates = enriched
       .filter((c) => c.email && isAcceptableOutreachEmail(c.email))
       .sort((a, b) => b.confidence - a.confidence);
 
-    return NextResponse.json({ candidates, query: queries[0], queriesUsed: queries });
+    return NextResponse.json({
+      candidates,
+      query: queries[queries.length > 1 ? 1 : 0] ?? queries[0],
+      queriesUsed: queries,
+      resolvedHost
+    });
   } catch {
     return NextResponse.json({ error: "Search request failed" }, { status: 500 });
   }
@@ -86,7 +117,23 @@ type Candidate = {
   confidence: number;
 };
 
-function buildCandidate(item: SerperResult, municipality: string, department: string): Candidate {
+function sameRegistrableHost(host: string | null, link: string): boolean {
+  if (!host) return false;
+  try {
+    const h = new URL(link).hostname.toLowerCase().replace(/^www\./, "");
+    const root = host.toLowerCase().replace(/^www\./, "");
+    return h === root || h.endsWith("." + root);
+  } catch {
+    return false;
+  }
+}
+
+function buildCandidate(
+  item: SerperResult,
+  municipality: string,
+  department: string,
+  resolvedHost: string | null
+): Candidate {
   const text = `${item.title} ${item.snippet}`;
   const emails = filterAcceptableEmails(extractEmailsFromText(text));
   const phones = extractAllPhones(text);
@@ -109,16 +156,17 @@ function buildCandidate(item: SerperResult, municipality: string, department: st
     sourceUrl: item.link,
     snippet: item.snippet,
     pageTitle: item.title,
-    confidence: scoreResult(item, municipality, department, emails, phones)
+    confidence: scoreResult(item, municipality, department, emails, phones, resolvedHost)
   };
 }
 
-async function enrichWithPageEmails(candidates: Candidate[]): Promise<Candidate[]> {
+async function enrichWithPageEmails(candidates: Candidate[], resolvedHost: string | null): Promise<Candidate[]> {
   const out = [...candidates];
+  const fetchCap = resolvedHost ? 6 : 3;
   const needFetch = out
     .map((c, i) => ({ c, i }))
-    .filter(({ c }) => !c.email && isAllowedContactPageUrl(c.sourceUrl))
-    .slice(0, 3);
+    .filter(({ c }) => !c.email && isFetchableContactUrl(c.sourceUrl, resolvedHost))
+    .slice(0, fetchCap);
 
   await Promise.all(
     needFetch.map(async ({ c, i }) => {
@@ -183,13 +231,15 @@ function scoreResult(
   municipality: string,
   department: string,
   emails: string[],
-  phones: string[]
+  phones: string[],
+  resolvedHost: string | null
 ): number {
   let score = 35;
   const text = `${item.title} ${item.snippet} ${item.link}`.toLowerCase();
   if (text.includes(municipality.toLowerCase())) score += 15;
   if (text.includes(department.toLowerCase())) score += 10;
   if (item.link.includes(".gov")) score += 15;
+  if (resolvedHost && sameRegistrableHost(resolvedHost, item.link)) score += 28;
   if (emails.length > 0) score += 20;
   if (phones.length > 0) score += 8;
   if (text.includes("contact")) score += 5;
