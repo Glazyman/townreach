@@ -7,6 +7,7 @@ import {
   isFetchableContactUrl
 } from "@/lib/contact-email";
 import { buildContactAssistantBrief } from "@/lib/contact-assistant-openai";
+import { gatherContactsViaOpenAiWebSearch } from "@/lib/contact-search-openai-web";
 import { crawlMunicipalDepartmentPages, discoverMunicipalHost, topicFromIntent } from "@/lib/municipal-site-search";
 
 function wantsSubdivisionHints(intent: string | undefined | null): boolean {
@@ -29,11 +30,25 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "municipality, state, and department are required" }, { status: 400 });
   }
 
-  const apiKey = process.env.SERPER_API_KEY;
-  if (!apiKey) {
+  const provider = process.env.CONTACT_SEARCH_PROVIDER?.trim().toLowerCase() ?? "serper";
+  const useOpenAiWeb = provider === "openai" || provider === "openai-web";
+
+  if (useOpenAiWeb && !process.env.OPENAI_API_KEY?.trim()) {
     return NextResponse.json(
       {
-        error: "Contact search is not configured. Set SERPER_API_KEY in .env.local (see https://serper.dev).",
+        error:
+          "CONTACT_SEARCH_PROVIDER=openai requires OPENAI_API_KEY (OpenAI Responses API with web_search).",
+        candidates: [],
+        searchProvider: "openai"
+      },
+      { status: 503 }
+    );
+  }
+
+  if (!useOpenAiWeb && !process.env.SERPER_API_KEY?.trim()) {
+    return NextResponse.json(
+      {
+        error: "Contact search is not configured. Set SERPER_API_KEY in .env.local (see https://serper.dev), or use CONTACT_SEARCH_PROVIDER=openai with OPENAI_API_KEY.",
         candidates: []
       },
       { status: 503 }
@@ -42,73 +57,94 @@ export async function GET(request: Request) {
 
   const queries: string[] = [];
   let resolvedHost: string | null = null;
+  let searchProvider: "serper" | "openai" = "serper";
 
   try {
-    const { host, discoveryQuery } = await discoverMunicipalHost(apiKey, municipality, state);
-    resolvedHost = host;
-    queries.push(discoveryQuery);
-
-    if (host) {
-      queries.push(
-        `${department}${topic} site:${host}`,
-        `${municipality} ${department}${topic} site:${host} email`,
-        `${department}${topic} staff directory site:${host}`
-      );
-    }
-
-    if (wantsSubdivisionHints(intent)) {
-      if (host) {
-        queries.push(
-          `planning board subdivision email site:${host}`,
-          `("zoning board of appeals" OR ZBA) email site:${host}`,
-          `building planning zoning contact email site:${host}`
-        );
-      }
-      queries.push(
-        `${municipality} ${state} planning board subdivision email`,
-        `${municipality} ${state} zoning board appeals email`
-      );
-    }
-
-    queries.push(
-      `${municipality} ${state} ${department}${topic} site:.gov staff directory email`,
-      `${municipality} ${state} ${department}${topic} contact email phone`,
-      `${municipality} ${state} ${department}${topic} site:.gov "@"`
-    );
-
-    const crawlOrganic = host ? await crawlMunicipalDepartmentPages(host, department, topic) : [];
-
-    const serperResults = await Promise.all(
-      queries.slice(1).map((q) =>
-        fetch("https://google.serper.dev/search", {
-          method: "POST",
-          headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
-          body: JSON.stringify({ q, num: 8 })
-        }).then((r) => r.json())
-      )
-    );
-
     const seen = new Set<string>();
     const organic: SerperResult[] = [];
 
-    for (const item of crawlOrganic) {
-      if (item.link && !seen.has(item.link)) {
-        seen.add(item.link);
-        organic.push(item);
-      }
-    }
-
-    for (const result of serperResults) {
-      for (const item of result.organic ?? []) {
+    if (useOpenAiWeb) {
+      searchProvider = "openai";
+      const pack = await gatherContactsViaOpenAiWebSearch({
+        municipality,
+        state,
+        department,
+        intent
+      });
+      resolvedHost = pack.resolvedHost;
+      for (const item of pack.organic) {
         if (item.link && !seen.has(item.link)) {
           seen.add(item.link);
           organic.push(item);
         }
       }
+      queries.push(...pack.queriesUsed);
+    } else {
+      const apiKey = process.env.SERPER_API_KEY!;
+      const { host, discoveryQuery } = await discoverMunicipalHost(apiKey, municipality, state);
+      resolvedHost = host;
+      queries.push(discoveryQuery);
+
+      if (host) {
+        queries.push(
+          `${department}${topic} site:${host}`,
+          `${municipality} ${department}${topic} site:${host} email`,
+          `${department}${topic} staff directory site:${host}`
+        );
+      }
+
+      if (wantsSubdivisionHints(intent)) {
+        if (host) {
+          queries.push(
+            `planning board subdivision email site:${host}`,
+            `("zoning board of appeals" OR ZBA) email site:${host}`,
+            `building planning zoning contact email site:${host}`
+          );
+        }
+        queries.push(
+          `${municipality} ${state} planning board subdivision email`,
+          `${municipality} ${state} zoning board appeals email`
+        );
+      }
+
+      queries.push(
+        `${municipality} ${state} ${department}${topic} site:.gov staff directory email`,
+        `${municipality} ${state} ${department}${topic} contact email phone`,
+        `${municipality} ${state} ${department}${topic} site:.gov "@"`
+      );
+
+      const crawlOrganic = host ? await crawlMunicipalDepartmentPages(host, department, topic) : [];
+
+      const serperResults = await Promise.all(
+        queries.slice(1).map((q) =>
+          fetch("https://google.serper.dev/search", {
+            method: "POST",
+            headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
+            body: JSON.stringify({ q, num: 8 })
+          }).then((r) => r.json())
+        )
+      );
+
+      for (const item of crawlOrganic) {
+        if (item.link && !seen.has(item.link)) {
+          seen.add(item.link);
+          organic.push(item);
+        }
+      }
+
+      for (const result of serperResults) {
+        for (const item of result.organic ?? []) {
+          if (item.link && !seen.has(item.link)) {
+            seen.add(item.link);
+            organic.push(item);
+          }
+        }
+      }
     }
 
+    const enrichCap = searchProvider === "openai" ? 12 : undefined;
     const baseCandidates = organic.map((item) => buildCandidate(item, municipality, department, resolvedHost));
-    const enriched = await enrichWithPageEmails(baseCandidates, resolvedHost);
+    const enriched = await enrichWithPageEmails(baseCandidates, resolvedHost, enrichCap);
 
     const candidates = enriched
       .filter((c) => c.email && isAcceptableOutreachEmail(c.email))
@@ -129,7 +165,8 @@ export async function GET(request: Request) {
       query: queries[queries.length > 1 ? 1 : 0] ?? queries[0],
       queriesUsed: queries,
       resolvedHost,
-      assistant
+      assistant,
+      searchProvider
     });
   } catch {
     return NextResponse.json({ error: "Search request failed" }, { status: 500 });
@@ -194,9 +231,13 @@ function buildCandidate(
   };
 }
 
-async function enrichWithPageEmails(candidates: Candidate[], resolvedHost: string | null): Promise<Candidate[]> {
+async function enrichWithPageEmails(
+  candidates: Candidate[],
+  resolvedHost: string | null,
+  maxUrlsToFetch?: number
+): Promise<Candidate[]> {
   const out = [...candidates];
-  const fetchCap = resolvedHost ? 6 : 3;
+  const fetchCap = maxUrlsToFetch ?? (resolvedHost ? 6 : 3);
   const needFetch = out
     .map((c, i) => ({ c, i }))
     .filter(({ c }) => !c.email && isFetchableContactUrl(c.sourceUrl, resolvedHost))
