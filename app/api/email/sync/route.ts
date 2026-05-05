@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server";
+import { parsePrimaryEmailFromFromHeader, normalizeEmailAddress } from "@/lib/email-parse";
 import { getGmailOAuthConfig, getStoredGmailTokens, getValidGmailAccessToken } from "@/lib/gmail-oauth";
 
 type SyncThreadInput = {
   provider: "gmail" | "outlook";
   providerThreadId: string;
+  /** When set, only a From matching this address counts as a reply (same recipient). */
+  recipientEmail?: string;
 };
 
 function headerValue(headers: { name: string; value: string }[] | undefined, name: string) {
   return headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? "";
 }
+
+type GmailMessage = {
+  internalDate?: string;
+  payload?: { headers?: { name: string; value: string }[] };
+};
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as { threads?: SyncThreadInput[] };
@@ -32,7 +40,7 @@ export async function POST(request: Request) {
     clientId: cfg.clientId,
     clientSecret: cfg.clientSecret
   });
-  const selfEmail = (connectedEmail || "").toLowerCase();
+  const selfEmail = normalizeEmailAddress(connectedEmail || "");
   const syncedReplies: { providerThreadId: string; status: "replied"; receivedAt: string }[] = [];
 
   for (const thread of gmailThreads) {
@@ -41,15 +49,36 @@ export async function POST(request: Request) {
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     if (!res.ok) continue;
-    const json = (await res.json()) as {
-      messages?: { internalDate?: string; payload?: { headers?: { name: string; value: string }[] } }[];
-    };
+    const json = (await res.json()) as { messages?: GmailMessage[] };
     const messages = json.messages ?? [];
     if (!selfEmail) continue;
-    const incoming = messages.find((m) => {
-      const from = headerValue(m.payload?.headers, "From").toLowerCase();
-      return !from.includes(selfEmail);
-    });
+
+    const sorted = [...messages].sort((a, b) => Number(a.internalDate ?? 0) - Number(b.internalDate ?? 0));
+    const targetRecipient = thread.recipientEmail?.trim()
+      ? normalizeEmailAddress(thread.recipientEmail)
+      : null;
+
+    let incoming: GmailMessage | undefined;
+
+    for (const m of sorted) {
+      const fromHeader = headerValue(m.payload?.headers, "From");
+      const fromAddr = parsePrimaryEmailFromFromHeader(fromHeader);
+      if (!fromAddr) continue;
+      if (fromAddr === selfEmail) continue;
+
+      if (targetRecipient) {
+        if (fromAddr === targetRecipient) {
+          incoming = m;
+          break;
+        }
+        continue;
+      }
+
+      // Legacy threads (no recipientEmail): first non-self From still counts as a reply.
+      incoming = m;
+      break;
+    }
+
     if (!incoming) continue;
     syncedReplies.push({
       providerThreadId: thread.providerThreadId,

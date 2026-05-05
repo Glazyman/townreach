@@ -12,6 +12,8 @@ export async function GET(request: Request) {
   const municipality = searchParams.get("municipality")?.trim();
   const state = searchParams.get("state")?.trim();
   const department = searchParams.get("department")?.trim();
+  const intent = searchParams.get("intent")?.trim();
+  const topic = intent ? ` ${intent}` : "";
 
   if (!municipality || !state || !department) {
     return NextResponse.json({ error: "municipality, state, and department are required" }, { status: 400 });
@@ -29,9 +31,9 @@ export async function GET(request: Request) {
   }
 
   const queries = [
-    `${municipality} ${state} ${department} site:.gov staff directory email`,
-    `${municipality} ${state} ${department} contact email phone`,
-    `${municipality} ${state} ${department} site:.gov "@"`
+    `${municipality} ${state} ${department}${topic} site:.gov staff directory email`,
+    `${municipality} ${state} ${department}${topic} contact email phone`,
+    `${municipality} ${state} ${department}${topic} site:.gov "@"`
   ];
 
   try {

@@ -34,6 +34,7 @@ const CoverageMap = dynamic(
 );
 import { greetingFirstName, polishSalutationSpacing } from "@/lib/contact-greeting";
 import { tokenReplace } from "@/lib/data";
+import { inferBestDepartment, neutralSearchDepartment } from "@/lib/intent-department";
 import { getDefaultEmailTemplates, loadStoredEmailTemplates, saveStoredEmailTemplates } from "@/lib/email-templates-storage";
 import type {
   ContactRecord,
@@ -107,6 +108,7 @@ function cloneWebCandidates(candidates: WebSearchCandidate[]): WebSearchCandidat
 
 const PAST_SEARCHES_STORAGE_KEY = "townreach-past-searches";
 const MAX_PAST_SEARCHES = 50;
+const OUTREACH_THREADS_STORAGE_KEY = "townreach-outreach-threads";
 const EMAIL_SETTINGS_STORAGE_KEY = "townreach-email-settings";
 /** Department dropdown: user needs help picking a function — search uses recommended match from intent text. */
 const DEPARTMENT_NOT_SURE = "not-sure";
@@ -119,48 +121,6 @@ const defaultEmailSettings: EmailConnectionSettings = {
   senderCompany: sender.companyName,
   senderEmail: ""
 };
-
-const departmentKeywords: Record<string, string[]> = {
-  building: ["building", "permit", "inspection", "inspector", "code", "construction", "contractor", "flooring", "renovation"],
-  planning: ["planning", "zoning", "variance", "land", "development", "site plan", "board approval"],
-  "public-works": ["public works", "road", "water", "sewer", "sidewalk", "sanitation", "infrastructure", "street"],
-  clerk: ["clerk", "records", "public record", "opra", "license", "minutes", "list", "document"],
-  procurement: ["procurement", "purchasing", "vendor", "bid", "rfp", "contract", "supplier"],
-  health: ["health", "restaurant", "environmental", "sanitary", "clinic", "food", "public health"],
-  education: ["school", "education", "board", "district", "superintendent", "student"],
-  finance: ["finance", "treasury", "budget", "accounting", "tax", "fiscal", "revenue", "audit"],
-  fire: ["fire", "firefighter", "fire department", "fire prevention", "fire code", "fire inspection", "emergency response"],
-  police: ["police", "public safety", "law enforcement", "sheriff", "emergency management", "security"],
-  parks: ["parks", "recreation", "park", "open space", "playground", "trails", "sports", "leisure"],
-  it: ["it", "technology", "tech", "digital", "software", "data", "systems", "cybersecurity", "network"],
-  legal: ["legal", "attorney", "city attorney", "counsel", "ordinance", "contract", "litigation"],
-  hr: ["human resources", "hr", "employment", "hiring", "benefits", "labor", "personnel", "workforce"],
-  engineering: ["engineering", "civil", "capital project", "infrastructure design", "survey", "drainage"],
-  environment: ["environmental", "sustainability", "recycling", "stormwater", "green", "conservation", "waste"],
-  "community-dev": ["community development", "economic development", "housing", "grants", "community programs", "cdbg"],
-  assessor: ["assessor", "appraisal", "valuation", "property tax", "mill levy"],
-  "city-manager": ["city manager", "town manager", "town administrator", "chief administrative"],
-  housing: ["housing authority", "affordable housing", "section 8", "voucher"],
-  "code-enforcement": ["code enforcement", "nuisance", "property maintenance", "zoning violation"],
-  airport: ["airport", "aviation"],
-  utilities: ["municipal utility", "public utility", "electric department", "water department"],
-  library: ["library", "librarian"],
-  court: ["municipal court", "magistrate"]
-};
-
-function recommendDepartment(departments: DepartmentRecord[], query: string) {
-  const normalized = query.toLowerCase();
-  if (!normalized.trim()) return undefined;
-  const scored = departments
-    .map((department) => {
-      const keywords = departmentKeywords[department.id] ?? [];
-      const score = keywords.reduce((total, keyword) => total + (normalized.includes(keyword) ? 1 : 0), 0);
-      return { department, score };
-    })
-    .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score);
-  return scored[0]?.department;
-}
 
 export function Dashboard({ data }: DashboardProps) {
   const [stateId, setStateId] = useState("");
@@ -175,7 +135,8 @@ export function Dashboard({ data }: DashboardProps) {
   const [selectedContact, setSelectedContact] = useState<ContactRecord | null>(null);
   const [composerMunicipality, setComposerMunicipality] = useState<MunicipalityRecord | undefined>(undefined);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [threads, setThreads] = useState<OutreachThread[]>(data.threads);
+  const [threads, setThreads] = useState<OutreachThread[]>([]);
+  const [threadsHydrated, setThreadsHydrated] = useState(false);
   const [intentQuery, setIntentQuery] = useState("");
   const intentInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -230,6 +191,42 @@ export function Dashboard({ data }: DashboardProps) {
       /* ignore */
     }
   }, [pastSearches, pastSearchesHydrated]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(OUTREACH_THREADS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as unknown;
+        if (Array.isArray(parsed)) {
+          const list = parsed.filter(
+            (t): t is OutreachThread =>
+              Boolean(t) &&
+              typeof t === "object" &&
+              typeof (t as OutreachThread).id === "string" &&
+              typeof (t as OutreachThread).providerThreadId === "string" &&
+              typeof (t as OutreachThread).provider === "string"
+          );
+          setThreads(list);
+        } else {
+          setThreads(data.threads);
+        }
+      } else {
+        setThreads(data.threads);
+      }
+    } catch {
+      setThreads(data.threads);
+    }
+    setThreadsHydrated(true);
+  }, [data.threads]);
+
+  useEffect(() => {
+    if (!threadsHydrated) return;
+    try {
+      localStorage.setItem(OUTREACH_THREADS_STORAGE_KEY, JSON.stringify(threads));
+    } catch {
+      /* ignore */
+    }
+  }, [threads, threadsHydrated]);
 
   useEffect(() => {
     try {
@@ -372,15 +369,18 @@ export function Dashboard({ data }: DashboardProps) {
   const selectedDepartment = departmentId === DEPARTMENT_NOT_SURE ? undefined : data.departments.find((d) => d.id === departmentId);
 
   const recommendedDepartment = useMemo(
-    () => recommendDepartment(data.departments, intentQuery),
+    () => (intentQuery.trim() ? inferBestDepartment(data.departments, intentQuery) : undefined),
     [intentQuery, data.departments]
   );
 
-  const effectiveDepartment = departmentId === DEPARTMENT_NOT_SURE ? recommendedDepartment : selectedDepartment;
+  const effectiveDepartment = useMemo(() => {
+    if (departmentId !== DEPARTMENT_NOT_SURE) return selectedDepartment;
+    const intent = intentQuery.trim();
+    if (!intent) return undefined;
+    return inferBestDepartment(data.departments, intentQuery) ?? neutralSearchDepartment(data.departments);
+  }, [departmentId, selectedDepartment, intentQuery, data.departments]);
 
-  const readyForLookup = Boolean(
-    stateId && countyId && municipalityId && effectiveDepartment
-  );
+  const readyForLookup = Boolean(stateId && countyId && municipalityId && effectiveDepartment);
 
   const filteredSearchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -547,6 +547,8 @@ export function Dashboard({ data }: DashboardProps) {
           state: state?.name ?? stateId,
           department: effectiveDepartment.name
         });
+        const intentTrim = intentQuery.trim();
+        if (intentTrim) params.set("intent", intentTrim);
         const res = await fetch(`/api/contacts/search?${params}`);
         const json = await res.json();
         if (!res.ok) {
@@ -578,7 +580,9 @@ export function Dashboard({ data }: DashboardProps) {
       }
       return;
     }
-    setSparkleMessage("Select state, county, and town. Pick a department or choose “Not sure” and describe what you need until a department is suggested, then run search.");
+    setSparkleMessage(
+      "Select state, county, and town. Pick a department, or choose “Not sure” and describe what you need (even briefly)—then run search here or in the assistant."
+    );
     setTimeout(() => setSparkleMessage(""), 4500);
   }
 
@@ -634,7 +638,7 @@ export function Dashboard({ data }: DashboardProps) {
               <div className="mb-4">
                 <h1 className="font-display text-xl font-bold text-brand sm:text-2xl">Municipal Outreach</h1>
                 <p className="mt-0.5 text-sm text-slate-500">
-                  Geography from the U.S. Census Bureau (all county-equivalents per state; towns are incorporated places and CDPs intersecting the county). Contacts come from live public web search—no sample directory.
+                  Places use U.S. Census boundaries; contacts are pulled from live public web search.
                 </p>
               </div>
 
@@ -722,6 +726,8 @@ export function Dashboard({ data }: DashboardProps) {
                 departmentModeNotSure={departmentId === DEPARTMENT_NOT_SURE}
                 municipality={selectedMunicipality}
                 onUseDepartment={(id) => { setDepartmentId(id); setSelectedContact(null); setSearchResults([]); }}
+                onIntentSearch={handleSparkle}
+                searchLoading={searchLoading}
               />
             )}
 
@@ -1623,7 +1629,9 @@ function IntentAssistant({
   department,
   departmentModeNotSure,
   municipality,
-  onUseDepartment
+  onUseDepartment,
+  onIntentSearch,
+  searchLoading
 }: {
   id: string;
   data: DashboardData;
@@ -1644,10 +1652,13 @@ function IntentAssistant({
   departmentModeNotSure: boolean;
   municipality?: MunicipalityRecord;
   onUseDepartment: (id: string) => void;
+  onIntentSearch: () => void;
+  searchLoading: boolean;
 }) {
   const hasInput = Boolean(intentQuery.trim());
   const countyDisabled = !stateId || countiesLoading;
   const townDisabled = !countyId || placesLoading;
+  const canRunIntentSearch = Boolean(stateId && countyId && municipalityId && intentQuery.trim()) && !searchLoading;
   return (
     <section id={id} className="col-span-12 rounded-2xl border border-slate-200/60 bg-white p-4 shadow-soft sm:p-6 lg:col-span-7">
       <div className="mb-5 flex items-start gap-3 sm:gap-4">
@@ -1655,12 +1666,13 @@ function IntentAssistant({
         <div className="min-w-0">
           <h3 className="font-display text-xl font-semibold text-brand">Not sure which department?</h3>
           <p className="mt-1 text-sm leading-6 text-slate-500">
-            Describe what you need in one line. We suggest a municipal function; you can narrow state, county, and town here too (they stay in sync with the filters above). Then run <span className="font-semibold text-slate-700">Search public contacts</span> for real emails.
+            Describe what you need in one line. We map it to a department when we can (including topics like subdivisions or permits). You can set state, county, and town here too—then search from this section or use{" "}
+            <span className="font-semibold text-slate-700">Search public contacts</span> above.
           </p>
         </div>
       </div>
 
-      <label className="mb-4 block">
+      <label className="mb-2 block">
         <span className="text-xs font-bold uppercase tracking-wide text-slate-500">What you&apos;re looking for</span>
         <input
           ref={intentInputRef}
@@ -1670,6 +1682,18 @@ function IntentAssistant({
           placeholder="Start typing — permits, bids, health inspection, clerk of records…"
         />
       </label>
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs text-slate-500">Runs the same web search as the main button, using your text to pick or broaden the department.</p>
+        <button
+          type="button"
+          onClick={onIntentSearch}
+          disabled={!canRunIntentSearch}
+          className="focus-ring flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {searchLoading ? <RefreshCw size={16} className="animate-spin" aria-hidden /> : <Sparkles size={16} aria-hidden />}
+          Search with this topic
+        </button>
+      </div>
 
       <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">Location (optional if already set above)</p>
       <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -1690,11 +1714,11 @@ function IntentAssistant({
       <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
         {departmentModeNotSure && (
           <p className="mb-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-medium text-slate-700">
-            You chose <span className="font-bold">Not sure</span> for department. Keep typing until a suggestion appears, then use it below or search with the button above.
+            You chose <span className="font-bold">Not sure</span> for department. We still infer a function from your text when possible; otherwise we run a broad municipal search using your words.
           </p>
         )}
         {!hasInput ? (
-          <p className="text-sm text-slate-500">Start typing in this box (same text as at the top) to get a department recommendation.</p>
+          <p className="text-sm text-slate-500">Start typing to get a department suggestion, then use <span className="font-semibold">Search with this topic</span> or the main search once state, county, and town are set.</p>
         ) : department ? (
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
@@ -1714,7 +1738,9 @@ function IntentAssistant({
             </div>
           </div>
         ) : (
-          <p className="text-sm text-slate-500">No department match yet. Try terms like permit, records, vendor, health, zoning, or school.</p>
+          <p className="text-sm text-slate-500">
+            No close department match—we&apos;ll use a general municipal target plus your exact words in the web search. Try <span className="font-semibold">Search with this topic</span> if state, county, and town are set.
+          </p>
         )}
       </div>
     </section>
@@ -1746,7 +1772,11 @@ function InboxPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          threads: threads.map((t) => ({ provider: t.provider, providerThreadId: t.providerThreadId }))
+          threads: threads.map((t) => ({
+            provider: t.provider,
+            providerThreadId: t.providerThreadId,
+            recipientEmail: t.recipientEmail
+          }))
         })
       });
       const data = await res.json();
@@ -1964,9 +1994,6 @@ function MapPanel({
         <div className="min-w-0">
           <h3 className="font-display text-xl font-semibold text-brand">Coverage map</h3>
           <p className="mt-2 text-sm leading-6 text-slate-500">{contextLine}</p>
-          <p className="mt-2 text-xs leading-5 text-slate-400">
-            Blue outline: selected county (Census 2020). Orange fill: selected incorporated place or CDP when a town is chosen. Basemap: OpenStreetMap.
-          </p>
         </div>
         <Map className="shrink-0 text-slate-400" size={24} aria-hidden />
       </div>

@@ -20,6 +20,7 @@ export async function POST(request: Request) {
         contactId: input.contactId,
         departmentId: input.departmentId,
         municipalityId: input.municipalityId,
+        recipientEmail: String(input.to ?? "").trim(),
         provider: input.provider,
         subject: input.subject,
         status: "sent",

@@ -47,6 +47,8 @@ export type OutreachThread = {
   contactId: string;
   departmentId: string;
   municipalityId: string;
+  /** Original To: address — sync marks "replied" when a later message From matches this mailbox (Gmail). */
+  recipientEmail?: string;
   provider: "gmail" | "outlook";
   subject: string;
   status: "draft" | "sent" | "replied" | "bounced" | "needs_follow_up";
